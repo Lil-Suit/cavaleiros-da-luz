@@ -320,8 +320,14 @@ input[type=range]{accent-color:var(--accent)}input[type=checkbox]{accent-color:v
   <button class="btn go" id="goFP">Jogar</button>
 </div>
 
+<script>(function(){var box;function show(t){try{if(!box){box=document.createElement('div');box.id='errBox';box.style.cssText='position:fixed;left:8px;right:8px;top:8px;z-index:99999;background:#7a1010;color:#fff;font:12px/1.35 monospace;padding:8px 10px;border-radius:6px;max-height:40vh;overflow:auto;white-space:pre-wrap';box.onclick=function(){box.remove();box=null};(document.body||document.documentElement).appendChild(box)}box.textContent+=t+'\n'}catch(e){}}
+window.addEventListener('error',function(e){show('Erro: '+(e.message||'?')+(e.lineno?' (linha '+e.lineno+')':''))});
+window.addEventListener('unhandledrejection',function(e){show('Erro: '+(e.reason&&e.reason.message||e.reason))});
+window.__erroTela=show})()</script>
 <script src="three.min.js"></script>
 <script>if(typeof THREE==="undefined"){document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>')}</script>
+<script>if(typeof THREE==="undefined"){document.write('<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"><\/script>')}</script>
+<script>if(typeof THREE==="undefined"&&window.__erroTela)__erroTela("Não consegui baixar o three.js (internet/bloqueio). Recarregue a página.")</script>
 <script>
 /* Reino de Arvelos — NÚCLEO DE REGRAS (autoritativo, sem dependência de renderização).
    Roda no navegador (inline no jogo) e no Node (testes). Toda validação de itens, dinheiro,
