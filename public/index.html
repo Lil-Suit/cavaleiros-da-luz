@@ -1236,6 +1236,7 @@ boot();
 </script>
 <script>
 window.__startGame=function(){
+try{
 (function(){
 const $=id=>document.getElementById(id),canvas=$('c');
 if(typeof THREE==='undefined'){$('start').innerHTML='<p>Não foi possível carregar o motor 3D. Verifique a conexão e recarregue a página.</p>';return}
@@ -2074,7 +2075,9 @@ function label(text,col,w){const c=document.createElement('canvas');c.width=320;
  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),transparent:true,depthWrite:false,toneMapped:false}));s.scale.set(w||5,(w||5)*56/320,1);return s}
 
 // ---- auxiliares de modelagem orgânica (pelagem, corpo deformado) ----
-function mkFurTex(){const cv=document.createElement('canvas');cv.width=128;cv.height=128;const c=cv.getContext('2d');c.fillStyle='#d8d8d8';c.fillRect(0,0,128,128);
+const TXC={};   // texturas desenhadas no canvas são caras: uma só por espécie, compartilhada por todos os monstros iguais
+function mkFurTex(){return TXC.fur||(TXC.fur=mkFurTex0())}
+function mkFurTex0(){const cv=document.createElement('canvas');cv.width=128;cv.height=128;const c=cv.getContext('2d');c.fillStyle='#d8d8d8';c.fillRect(0,0,128,128);
  for(let i=0;i<1500;i++){const x=Math.random()*128,y=Math.random()*128,l=3+Math.random()*5,a=(Math.random()-.5)*.7+1.57,v=Math.floor(120+Math.random()*135);c.strokeStyle='rgba('+v+','+v+','+v+',.55)';c.lineWidth=.8+Math.random()*.6;c.beginPath();c.moveTo(x,y);c.lineTo(x+Math.cos(a)*l,y+Math.sin(a)*l);c.stroke()}
  const t=new THREE.CanvasTexture(cv);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(3,3);return t}
 // esfera esticada ao longo de z com perfil de raio prof(t)=[rx,ry], t em [-1,1] (cabeça em +1); cores de vértice dorso→flanco→barriga
@@ -2088,9 +2091,9 @@ function skinBody(o){const bg=new THREE.SphereGeometry(1,22,16);bg.rotateX(Math.
 const BUILD={
  rat(){cur=[];const g=new THREE.Group(),root=new THREE.Group();g.add(root);
   // textura de pelo (fios curtos em tons de marrom) – o degradê dorso/barriga vem das cores de vértice
-  const cv=document.createElement('canvas');cv.width=128;cv.height=128;const c=cv.getContext('2d');c.fillStyle='#d8d8d8';c.fillRect(0,0,128,128);
+  const tex=TXC.rat||(TXC.rat=(()=>{const cv=document.createElement('canvas');cv.width=128;cv.height=128;const c=cv.getContext('2d');c.fillStyle='#d8d8d8';c.fillRect(0,0,128,128);
   for(let i=0;i<1500;i++){const x=Math.random()*128,y=Math.random()*128,l=3+Math.random()*5,a=(Math.random()-.5)*.7+1.57,v=Math.floor(120+Math.random()*135);c.strokeStyle='rgba('+v+','+v+','+v+',.55)';c.lineWidth=.8+Math.random()*.6;c.beginPath();c.moveTo(x,y);c.lineTo(x+Math.cos(a)*l,y+Math.sin(a)*l);c.stroke()}
-  const tex=new THREE.CanvasTexture(cv);tex.wrapS=tex.wrapT=THREE.RepeatWrapping;tex.repeat.set(3,3);
+  const t=new THREE.CanvasTexture(cv);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(3,3);return t})());
   const fur=M('#ffffff',{roughness:.95,metalness:0,vertexColors:true});fur.map=tex;
   // corpo: esfera deformada (ancas largas, ombros estreitos, barriga mais clara)
   const bg=new THREE.SphereGeometry(1,22,16);bg.rotateX(Math.PI/2);bg.rotateZ(Math.PI/2);   // polos no eixo z, costura embaixo
@@ -2139,7 +2142,7 @@ const BUILD={
    for(let r=0;r<32;r++){const y=r*4+2,off=r%2?4:0;for(let q=0;q<64;q++){const x=q*4+off;const belly=x>92&&x<164;
      if(belly){c.fillStyle='rgba(120,100,50,.18)';c.fillRect(92,y+1,72,1)}else{c.fillStyle='rgba(10,24,6,.34)';c.beginPath();c.ellipse(x,y,2.4,2.1,0,0,6.283);c.fill();c.fillStyle='rgba(255,255,220,.14)';c.beginPath();c.ellipse(x-.4,y-.6,1.2,.9,0,0,6.283);c.fill()}}}
    const t=new THREE.CanvasTexture(cv);t.wrapS=t.wrapT=THREE.RepeatWrapping;if(t.anisotropy!==undefined)t.anisotropy=4;return t};
-  const tex=mkTex(),bm=M('#ffffff',{roughness:.5,metalness:.08});bm.map=tex;
+  const tex=TXC.cobra||(TXC.cobra=mkTex()),bm=M('#ffffff',{roughness:.5,metalness:.08});bm.map=tex;
   // corpo contínuo (tubo que ondula)
   const NR=36,RS=12,L=3.1,pos=new Float32Array((NR+1)*(RS+1)*3),uv=new Float32Array((NR+1)*(RS+1)*2),idx=[];
   for(let i=0;i<=NR;i++)for(let j=0;j<=RS;j++){const k=i*(RS+1)+j;uv[k*2]=j/RS;uv[k*2+1]=i/NR*5.5}
@@ -3586,8 +3589,8 @@ function vMuzzle(x,y,z,c,big){if(!vOk())return;vGlow(x,y,z,'#ffffff',.3,big?2.2:
 function vCastAura(c,R){if(!vOk())return;vRune(P.x,P.z,c,R||2.2,.7,{points:6,spin:3});vSparks(P.x,P.y+.2,P.z,c,12,1.6,.6,{up:1.2,len:.7,flat:false})}
 /* um efeito visual NUNCA pode quebrar o jogo: cada função de efeito roda protegida */
 const VFX_ERR={n:0,last:''};
-for(const k of['vGlow','vSparks','vRing','vDome','vPillar','vCracks','vDebris','vAfter','vCross','vRune','vImpact','vScreen','vWhirl','vQuake','vIai','vFrost','vBoltLine','vFireBlast','vRainStart','vRainHit','vMuzzle','vCastAura']){
- const f=eval(k);eval(k+'=function(){try{return f.apply(null,arguments)}catch(e){VFX_ERR.n++;VFX_ERR.last=k+": "+e.message}}')}
+const vfxWrap=(k,f)=>function(){try{return f.apply(null,arguments)}catch(e){VFX_ERR.n++;VFX_ERR.last=k+": "+e.message}};   // sem eval: o servidor bloqueia eval (CSP)
+vGlow=vfxWrap('vGlow',vGlow);vSparks=vfxWrap('vSparks',vSparks);vRing=vfxWrap('vRing',vRing);vDome=vfxWrap('vDome',vDome);vPillar=vfxWrap('vPillar',vPillar);vCracks=vfxWrap('vCracks',vCracks);vDebris=vfxWrap('vDebris',vDebris);vAfter=vfxWrap('vAfter',vAfter);vCross=vfxWrap('vCross',vCross);vRune=vfxWrap('vRune',vRune);vImpact=vfxWrap('vImpact',vImpact);vScreen=vfxWrap('vScreen',vScreen);vWhirl=vfxWrap('vWhirl',vWhirl);vQuake=vfxWrap('vQuake',vQuake);vIai=vfxWrap('vIai',vIai);vFrost=vfxWrap('vFrost',vFrost);vBoltLine=vfxWrap('vBoltLine',vBoltLine);vFireBlast=vfxWrap('vFireBlast',vFireBlast);vRainStart=vfxWrap('vRainStart',vRainStart);vRainHit=vfxWrap('vRainHit',vRainHit);vMuzzle=vfxWrap('vMuzzle',vMuzzle);vCastAura=vfxWrap('vCastAura',vCastAura);
 // morte de um monstro: clarão + anel + faíscas subindo, na cor do que o matou
 function vDeathFx(m){if(!partsOn||!vOk())return;try{const c=m.def.element==='fire'?'#ff9a3a':m.def.element==='ice'?'#9fe0ff':m.def.element==='shadow'?'#b56bff':'#ffffff',y=mY(m),big=(m.vis.sc||1)>1.6||m.boss;
  vGlow(m.x,y,m.z,c,.8,big?7:3.2,.4,.7);vRing(m.x,hgt(m.x,m.z)+.2,m.z,c,.4,big?7:3,.5,{flat:true});vSparks(m.x,y,m.z,c,big?24:10,big?5:2.6,.7,{up:1.2,len:.8});if(big){vPillar(m.x,hgt(m.x,m.z),m.z,c,1.4,12,.7);vScreen(c,.18)}}catch(e){}}
@@ -6403,6 +6406,7 @@ window.__ARV={playerSwing,applyQuality,setViewDist,setReflections,REFL,CHUNKS,ch
 requestAnimationFrame(frame);
 
 })();
+}catch(e){var m=(e&&e.stack?e.stack:String(e)).split('\n').slice(0,3).join(' | ');if(window.__erroTela)__erroTela('Erro ao iniciar o jogo: '+m);var a=document.getElementById('authBox');try{document.getElementById('auth').style.display='none'}catch(_){}throw e}
 };
 if(!window.__GATE)window.__startGame();
 </script>

@@ -1,5 +1,5 @@
 /* Service worker do Cavaleiros da Luz: guarda o jogo para abrir offline. Troque VERSAO a cada atualização. */
-const VERSAO='cavaleiros-v45-58';
+const VERSAO='cavaleiros-v45-60';
 const ARQUIVOS=['./','./index.html','./three.min.js','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(VERSAO).then(c=>Promise.all(ARQUIVOS.map(u=>c.add(u).catch(()=>{})))).then(()=>self.skipWaiting()))});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==VERSAO).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
