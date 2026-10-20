@@ -1,0 +1,18 @@
+# Deploy no Render.com (Blueprint). Disco persistente é OBRIGATÓRIO: é onde ficam contas e progresso.
+services:
+  - type: web
+    name: cavaleiros-da-luz
+    runtime: node
+    plan: starter            # disco persistente exige plano pago
+    buildCommand: "echo ok"
+    startCommand: node server.js
+    healthCheckPath: /api/ping
+    disk:
+      name: dados
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: DATA_DIR
+        value: /data
+      - key: PUBLIC_URL
+        sync: false          # ex.: https://cavaleiros-da-luz.onrender.com
