@@ -210,6 +210,7 @@ function drawIcon(x,d,nobg,force){const R=RAR[d.rarity],col=(d.icon&&d.icon.c)||
   if(id==='mat_rat_tail'){x.strokeStyle='#e8a6a6';x.lineWidth=3.5;x.beginPath();x.moveTo(10,36);x.bezierCurveTo(20,40,18,22,30,26);x.bezierCurveTo(38,28,38,14,40,10);x.stroke()}
   else if(id==='mat_snake_fang'){poly('#f6f2e4',[[18,10],[30,10],[27,38],[21,38]]);poly('#cfc9b3',[[27,10],[30,10],[27,38]])}
   else if(id==='mat_goblin_ear'){poly('#6fbf4a',[[10,30],[22,12],[38,10],[30,22],[26,36]]);poly('#4a8f30',[[18,28],[24,18],[32,16],[26,28]])}
+  else if(id==='arrow'){line(3,'#c9a56b',[[10,38],[36,12]]);poly('#dfe6ee',[[40,8],[30,10],[38,18]]);poly('#e04a4a',[[8,36],[14,30],[10,42]]);poly('#e04a4a',[[12,40],[18,34],[14,44]])}
   else if(id==='mat_bone_shard'){line(6,'#efe8d4',[[12,36],[34,14]]);dot(10,34,4,'#efe8d4');dot(14,38,4,'#efe8d4');dot(34,12,4,'#efe8d4');dot(38,16,4,'#efe8d4')}
   else if(id==='mat_orc_tusk'){x.strokeStyle='#efe3c0';x.lineWidth=7;x.beginPath();x.arc(36,34,22,Math.PI,Math.PI*1.45);x.stroke()}
   else if(id==='mat_ectoplasm'){x.fillStyle='rgba(120,220,255,.85)';x.beginPath();x.moveTo(24,8);x.bezierCurveTo(40,22,38,38,24,40);x.bezierCurveTo(10,38,8,22,24,8);x.fill();dot(20,28,3,'#fff9')}

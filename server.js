@@ -109,8 +109,8 @@ function validateSave(raw, prev) {
   if (!o || typeof o !== 'object') return { err: 'save inválido' };
   let st; try { st = Core.deserialize(JSON.parse(JSON.stringify(o))); } catch (e) { st = null; }
   if (!st) return { err: 'save inválido' };
-  if (!(st.level >= 1 && st.level <= 999)) return { err: 'nível inválido' };
-  for (const k of ['melee', 'dist', 'magic', 'def']) { const v = st.sk && st.sk[k] && st.sk[k].lv; if (!(v >= 1 && v <= 999)) return { err: 'habilidade inválida' }; }
+  if (!(st.level >= 1 && st.level <= 1000)) return { err: 'nível inválido' };
+  for (const k of ['melee', 'dist', 'magic', 'def']) { const v = st.sk && st.sk[k] && st.sk[k].lv; if (!(v >= 1 && v <= 1000)) return { err: 'habilidade inválida' }; }
   if (!(st.gold >= 0 && st.gold <= 1e12) || !(st.bankGold >= 0 && st.bankGold <= 1e12)) return { err: 'ouro inválido' };
   let n = 0;
   for (const e of [].concat(o.inv || [], o.bank || [], Object.values(o.eq || {}))) if (e && (typeof e.id !== 'string' || !ITEM[e.id])) return { err: 'item inexistente' };
@@ -119,6 +119,7 @@ function validateSave(raw, prev) {
   /* plausibilidade: evolução máxima por tempo desde o último salvamento */
   const p = prev && prev.data ? Core.deserialize(prev.data) : null;
   const dtS = prev ? Math.max(1, (now() - prev.t) / 1000) : 1;
+  if (ENV.TESTE_LIVRE === '1') return { st, o };   // modo de teste: sem limite de evolução (remova a variável depois)
   if (!p) { if (st.level > 5 || st.gold > 5000) return { err: 'personagem inicial inválido' }; }
   else {
     if (st.level - p.level > 2 + dtS / 25) return { err: 'evolução rápida demais (nível)' };

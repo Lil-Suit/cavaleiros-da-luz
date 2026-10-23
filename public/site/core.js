@@ -10,7 +10,7 @@ const CFG={
  critMult:1.75,critCap:.6,dodgeCap:.3,atkSpeedCap:2,moveCap:.4,resCap:75,minAtkMs:300,
  luckMaxRel:.25,dropChanceCapRel:2,
  xpBase:25,xpGrow:1.2,skillBase:6,skillGrow:1.12,skillGain:.85,
- mitigationK_monster:2.2,mitigationK_player:2,
+ mitigationK_monster:.5,mitigationK_player:2,
  deathGoldLoss:.1,eligibleMinDmgPct:.05,bossEligibleMinDmgPct:.1,
  txLogMax:100,chatMax:160
 };
@@ -21,12 +21,12 @@ const RARITY_BG_MIN_MOB_LEVEL=100;
 function rarityShown(id){return needsTier(ITEMS[id])}
 /* ===== FUNDOS (níveis de qualidade) — todo equipamento de nível 100+ vem com um fundo, sorteado ao cair =====
    Básico (fácil/fraco) → Comum → Raro → Épico → Ultra raro → Lendário (raríssimo/forte). Cada fundo aumenta os atributos do item. */
-const TIERS=[null,{k:'common',n:'Básico',mul:1,w:45},{k:'uncommon',n:'Comum',mul:1.08,w:28},{k:'rare',n:'Raro',mul:1.18,w:15},{k:'epic',n:'Épico',mul:1.3,w:7},{k:'ultra',n:'Ultra raro',mul:1.46,w:4},{k:'legendary',n:'Lendário',mul:1.7,w:1}];
+const TIERS=[null,{k:'common',n:'Básico',mul:1,w:45},{k:'uncommon',n:'Comum',mul:1.05,w:28},{k:'rare',n:'Raro',mul:1.1,w:15},{k:'epic',n:'Épico',mul:1.18,w:7},{k:'ultra',n:'Ultra raro',mul:1.26,w:4},{k:'legendary',n:'Lendário',mul:1.35,w:1}];
 const TIER_MIN_REQ=100;
 const needsTier=d=>!!d&&(d.type==='weapon'||d.type==='armor')&&((d.reqLevel||0)>=TIER_MIN_REQ||!!d.tiered);
 const LEGACY_TIER={common:1,uncommon:2,rare:3,epic:4,ultra:5,legendary:6};
-function tierOf(e){const d=e&&ITEMS[e.id];if(!needsTier(d))return 0;const t=e.t|0,mn=d.tierMin||1;return Math.max(mn,t>=1&&t<=6?t:(LEGACY_TIER[d.rarity]||1))}
-const tierMul=e=>{const t=tierOf(e);return t?TIERS[t].mul:1};
+function tierOf(e){const d=e&&ITEMS[e.id];if(!needsTier(d))return 0;if(d.tierFix)return d.tierFix;const t=e.t|0,mn=d.tierMin||1;return Math.max(mn,t>=1&&t<=6?t:(LEGACY_TIER[d.rarity]||1))}
+const tierMul=e=>{if(e&&ITEMS[e.id]&&ITEMS[e.id].tierFix)return 1;const t=tierOf(e);return t?TIERS[t].mul:1};   // itens com fundo fixo (cordões +10/+20) não mudam de valor com o fundo
 const effRarity=e=>{const t=tierOf(e);return t?TIERS[t].k:(ITEMS[e.id]||{}).rarity};
 function rollTier(rng,boost,min){rng=rng||Math.random;min=min||1;const w=TIERS.slice(1).map((q,i)=>i+1<min?0:q.w*(boost&&i>=3?boost:1)),tot=w.reduce((a,b)=>a+b,0);let r=rng()*tot;for(let i=0;i<6;i++){r-=w[i];if(r<0)return i+1}return min}
 const SLOTS=['weaponMelee','weaponDist','weaponMagic','helmet','armor','legs','boots','shield','accessory','necklace','backpack'];
@@ -109,6 +109,7 @@ C('potion_hp_big','Poção de Vida Grande','uncommon',80,50,{healPct:.9},'Restau
 C('antidote','Antídoto','common',15,50,{cure:'poison'},'Remove o veneno.','potion_mp');
 C('scroll_town','Pergaminho de Retorno','uncommon',30,20,{teleport:'town'},'Leva você de volta à vila.','scroll');
 const Mt=(id,name,rarity,sell,desc)=>add({id,name,type:'material',rarity,sell,stack:99,desc:desc||'',icon:{k:'material'}});
+add({id:'arrow',name:'Flecha',type:'material',rarity:'common',sell:2,stack:999,desc:'Munição do arco: cada flecha disparada gasta 1 (Tripla gasta 3, Chuva de Flechas 5). Vendida pelo Lojista e pelo Ferreiro.',icon:{k:'material'}});
 Mt('mat_rat_tail','Cauda de Rato','common',2);Mt('mat_snake_fang','Presa de Cobra','common',5);Mt('mat_slime_goo','Gosma de Slime','common',3);Mt('mat_goblin_ear','Orelha de Goblin','common',12);
 Mt('mat_bone_shard','Fragmento de Osso','common',20);Mt('mat_orc_tusk','Presa de Orc','uncommon',45);Mt('mat_ectoplasm','Ectoplasma','uncommon',90);
 Mt('mat_feather','Pena de Pássaro','common',4);Mt('mat_rotten_flesh','Carne Podre','common',25);Mt('mat_wolf_fang','Presa de Lobo','uncommon',160);Mt('mat_plasma_core','Núcleo de Plasma','rare',380);
@@ -188,35 +189,41 @@ const MONSTERS={
  salamander:{name:'Salamandra de Magma',level:52,hp:3400,atk:200,def:45,xp:3300,gold:[320,640],speed:4.5,aggro:16,respawn:20,element:'fire',onHit:{status:'burn',chance:.4,val:16,dur:4},res:{fire:90,ice:-40},ranged:{range:14,keep:7,cd:2.4,kind:'fire'},cave:1,
   drops:[D('mat_magma_heart',.5),D('potion_hp_big',.3,1,2),D('ring_fire',.03),D('weapon_ruby_blade',.01),D('weapon_arcane_wand',.01)]},
  // ---- Ilha Eldorath: só nível 150 ou mais ----
- colossus:{name:'Colosso de Obsidiana',level:150,hp:160000,atk:1500,def:320,xp:0,xpFromLevel:55,gold:[8000,16000],speed:3.6,aggro:18,respawn:60,atkCd:2.0,element:'phys',res:{phys:30,fire:60,ice:-30},onHit:{status:'stun',chance:.2,val:0,dur:1},far:1,
+ colossus:{name:'Colosso de Obsidiana',level:175,hp:160000,atk:1500,def:320,xp:0,xpFromLevel:55,gold:[8000,16000],speed:3.6,aggro:18,respawn:60,atkCd:2.0,element:'phys',res:{phys:30,fire:60,ice:-30},onHit:{status:'stun',chance:.2,val:0,dur:1},far:1,
   drops:[D('mat_obsidian_shard',.7,1,2),D('weapon_obsidian_blade',.012),D('helm_abyss',.012),D('armor_abyss',.008),D('potion_hp_mega',.2),D('skin_drop_b',.01)]},
- dragon_ember:{name:'Dragão de Brasas',level:170,hp:170000,atk:1900,def:300,xp:0,xpFromLevel:49,gold:[10000,20000],speed:5.6,aggro:26,respawn:70,atkCd:1.4,element:'fire',res:{fire:90,ice:-40},breath:{kind:'fire',range:23,cd:3.0},onHit:{status:'burn',chance:.4,val:60,dur:5},far:1,
+ dragon_ember:{name:'Dragão de Brasas',level:200,hp:170000,atk:1900,def:300,xp:0,xpFromLevel:49,gold:[10000,20000],speed:5.6,aggro:26,respawn:70,atkCd:1.4,element:'fire',res:{fire:90,ice:-40},breath:{kind:'fire',range:23,cd:3.0},onHit:{status:'burn',chance:.4,val:60,dur:5},far:1,
   drops:[D('mat_ember_scale',.7,1,2),D('armor_abyss',.01),D('weapon_obsidian_blade',.01),D('potion_hp_mega',.25),D('skin_drop_b',.012)]},
- dragon_frost:{name:'Dragão Glacial',level:185,hp:240000,atk:2200,def:380,xp:0,xpFromLevel:47,gold:[12000,24000],speed:3.3,aggro:26,respawn:70,atkCd:1.5,element:'ice',res:{ice:90,fire:-40},breath:{kind:'ice',range:23,cd:3.2},onHit:{status:'slow',chance:.35,val:.5,dur:3},far:1,
+ dragon_frost:{name:'Dragão Glacial',level:225,hp:240000,atk:2200,def:380,xp:0,xpFromLevel:47,gold:[12000,24000],speed:3.3,aggro:26,respawn:70,atkCd:1.5,element:'ice',res:{ice:90,fire:-40},breath:{kind:'ice',range:23,cd:3.2},onHit:{status:'slow',chance:.35,val:.5,dur:3},far:1,
   drops:[D('mat_frost_scale',.7,1,2),D('shield_abyss',.01),D('helm_abyss',.01),D('potion_hp_mega',.25),D('skin_drop_c',.012)]},
  dragon_storm:{name:'Dragão da Tempestade',level:200,hp:260000,atk:2400,def:330,xp:0,xpFromLevel:46,gold:[13000,26000],speed:7.0,aggro:30,respawn:75,atkCd:1.3,element:'arcane',res:{arcane:70,phys:10},breath:{kind:'bolt',range:26,cd:2.6},onHit:{status:'stun',chance:.2,val:0,dur:.9},far:1,
   drops:[D('mat_storm_scale',.7,1,2),D('weapon_void_bow',.012),D('boots_abyss',.012),D('potion_hp_mega',.25),D('skin_drop_c',.012)]},
- dragon_void:{name:'Dragão do Vazio',level:240,hp:450000,atk:3200,def:450,xp:0,xpFromLevel:43,gold:[22000,44000],speed:6.4,aggro:30,respawn:80,atkCd:1.4,element:'shadow',res:{shadow:90,phys:25},breath:{kind:'void',range:26,cd:2.8},onHit:{status:'slow',chance:.35,val:.55,dur:3},far:1,
+ dragon_void:{name:'Dragão do Vazio',level:225,hp:450000,atk:3200,def:450,xp:0,xpFromLevel:43,gold:[22000,44000],speed:6.4,aggro:30,respawn:80,atkCd:1.4,element:'shadow',res:{shadow:90,phys:25},breath:{kind:'void',range:26,cd:2.8},onHit:{status:'slow',chance:.35,val:.55,dur:3},far:1,
   drops:[D('mat_void_heart',.7,1,2),D('weapon_lich_staff',.012),D('legs_abyss',.012),D('potion_hp_mega',.3),D('skin_drop_d',.012)]},
- dragon_elder:{name:'Dragão Ancestral',level:270,hp:700000,atk:4200,def:600,xp:0,xpFromLevel:40,gold:[40000,80000],speed:5.2,aggro:30,respawn:90,atkCd:1.6,element:'fire',res:{fire:60,ice:40,shadow:40,phys:40},breath:{kind:'holy',range:28,cd:3.0},onHit:{status:'burn',chance:.4,val:90,dur:6},far:1,
+ dragon_elder:{name:'Dragão Ancestral',level:275,hp:700000,atk:4200,def:600,xp:0,xpFromLevel:40,gold:[40000,80000],speed:5.2,aggro:30,respawn:90,atkCd:1.6,element:'fire',res:{fire:60,ice:40,shadow:40,phys:40},breath:{kind:'holy',range:28,cd:3.0},onHit:{status:'burn',chance:.4,val:90,dur:6},far:1,
   drops:[D('mat_elder_scale',.8,1,3),D('weapon_seraph_sword',.004),D('weapon_seraph_staff',.004),D('weapon_seraph_bow',.004),D('ring_behemoth',.006),D('potion_hp_mega',.4,1,2),D('skin_drop_e',.02)]},
- dragon_ice:{name:'Dragão da Neve',level:215,hp:330000,atk:2900,def:420,xp:0,xpFromLevel:44,gold:[16000,32000],speed:3.6,aggro:28,respawn:75,atkCd:1.4,element:'ice',res:{ice:95,fire:-45},breath:{kind:'ice',range:25,cd:2.8},onHit:{status:'slow',chance:.4,val:.45,dur:3.5},far:1,
+ dragon_ice:{name:'Dragão da Neve',level:250,hp:330000,atk:2900,def:420,xp:0,xpFromLevel:44,gold:[16000,32000],speed:3.6,aggro:28,respawn:75,atkCd:1.4,element:'ice',res:{ice:95,fire:-45},breath:{kind:'ice',range:25,cd:2.8},onHit:{status:'slow',chance:.4,val:.45,dur:3.5},far:1,
   drops:[D('mat_snow_scale',.7,1,2),D('mat_ice_crystal',.4,1,2),D('helm_abyss',.01),D('boots_abyss',.01),D('potion_hp_mega',.3),D('skin_drop_c',.014)]},
  ice_man:{name:'Homem de Gelo',level:175,hp:140000,atk:1800,def:300,xp:0,xpFromLevel:49,gold:[9000,18000],speed:3.1,aggro:20,respawn:50,atkCd:1.5,element:'ice',res:{ice:80,fire:-40,phys:10},onHit:{status:'slow',chance:.35,val:.6,dur:3},far:1,
   drops:[D('mat_ice_crystal',.7,1,2),D('armor_abyss',.008),D('legs_abyss',.01),D('potion_hp_mega',.2),D('skin_drop_b',.01)]},
  ice_emperor:{name:'Imperador Glacius',level:300,hp:2500000,atk:5200,def:800,xp:0,xpFromLevel:36,gold:[120000,200000],speed:3,aggro:34,respawn:240,atkCd:1.8,element:'ice',res:{ice:95,phys:40,fire:-35},breath:{kind:'ice',range:32,cd:2.2},onHit:{status:'stun',chance:.25,val:0,dur:1.2},far:1,
   drops:[D('mat_glacius_heart',1),D('mat_snow_scale',1,2,4),D('mat_ice_crystal',1,3,6),D('weapon_seraph_sword',.02),D('weapon_seraph_staff',.02),D('weapon_seraph_bow',.02),D('ring_behemoth',.04),D('potion_hp_mega',1,2,4),D('skin_drop_e',.08)]},
- wyvern:{name:'Wyvern do Vazio',level:165,hp:150000,atk:1750,def:300,xp:0,xpFromLevel:50,gold:[9000,18000],speed:6.5,aggro:26,respawn:60,atkCd:1.4,element:'shadow',res:{shadow:60,phys:15},breath:{kind:'void',range:24,cd:3.2},onHit:{status:'slow',chance:.25,val:.6,dur:3},far:1,
+ wyvern:{name:'Wyvern do Vazio',level:175,hp:150000,atk:1750,def:300,xp:0,xpFromLevel:50,gold:[9000,18000],speed:6.5,aggro:26,respawn:60,atkCd:1.4,element:'shadow',res:{shadow:60,phys:15},breath:{kind:'void',range:24,cd:3.2},onHit:{status:'slow',chance:.25,val:.6,dur:3},far:1,
   drops:[D('mat_void_scale',.7,1,2),D('weapon_void_bow',.012),D('boots_abyss',.012),D('legs_abyss',.01),D('potion_hp_mega',.2),D('skin_drop_b',.01)]},
- lich:{name:'Lich Real',level:180,hp:190000,atk:2100,def:280,xp:0,xpFromLevel:48,gold:[11000,22000],speed:4.2,aggro:26,respawn:60,element:'shadow',res:{shadow:80,phys:20,fire:-25},ranged:{range:23,keep:15,cd:2.2,kind:'void'},far:1,
+ lich:{name:'Lich Real',level:175,hp:190000,atk:2100,def:280,xp:0,xpFromLevel:48,gold:[11000,22000],speed:4.2,aggro:26,respawn:60,element:'shadow',res:{shadow:80,phys:20,fire:-25},ranged:{range:23,keep:15,cd:2.2,kind:'void'},far:1,
   drops:[D('mat_lich_dust',.7,1,3),D('weapon_lich_staff',.012),D('shield_abyss',.012),D('potion_mp_big',.4,2,3),D('potion_hp_mega',.2),D('skin_drop_c',.01)]},
- frost_titan:{name:'Titã Glacial',level:195,hp:380000,atk:2600,def:450,xp:0,xpFromLevel:45,gold:[14000,28000],speed:2.3,aggro:18,respawn:70,atkCd:2.2,element:'ice',res:{ice:90,phys:35,fire:-40},onHit:{status:'slow',chance:.4,val:.55,dur:3},far:1,
+ frost_titan:{name:'Titã Glacial',level:200,hp:380000,atk:2600,def:450,xp:0,xpFromLevel:45,gold:[14000,28000],speed:2.3,aggro:18,respawn:70,atkCd:2.2,element:'ice',res:{ice:90,phys:35,fire:-40},onHit:{status:'slow',chance:.4,val:.55,dur:3},far:1,
   drops:[D('mat_titan_ice',.7,1,2),D('amulet_titan',.012),D('armor_abyss',.01),D('potion_hp_mega',.25),D('skin_drop_c',.01)]},
- hydra:{name:'Hidra Abissal',level:210,hp:300000,atk:2800,def:340,xp:0,xpFromLevel:42,gold:[16000,32000],speed:4.0,aggro:20,respawn:70,atkCd:1.5,element:'phys',res:{ice:30,fire:-20},onHit:{status:'poison',chance:.5,val:60,dur:8},ranged:{range:17,keep:6,cd:1.9,kind:'venom'},far:1,
+ ice_warden:{name:'Guardião do Gelo Eterno',level:320,hp:1500000,atk:5600,def:850,xp:0,xpFromLevel:36,gold:[70000,130000],speed:3.1,aggro:26,respawn:150,atkCd:1.7,element:'ice',res:{ice:95,phys:42,fire:-35},onHit:{status:'slow',chance:.5,val:.5,dur:3.5},far:1,cave:1,
+  drops:[D('mat_titan_ice',.6,1,2),D('potion_hp_mega',.2),D('skin_drop_c',.008)]},
+ ice_golem:{name:'Golem de Gelo',level:310,hp:520000,atk:3600,def:600,xp:0,xpFromLevel:38,gold:[30000,60000],speed:3.7,aggro:24,respawn:50,atkCd:1.5,element:'ice',res:{ice:95,phys:38,fire:-35},onHit:{status:'slow',chance:.4,val:.55,dur:3},far:1,cave:1,
+  drops:[D('mat_ice_crystal',.8,1,3),D('mat_titan_ice',.4,1,2),D('potion_hp_mega',.25),D('skin_drop_c',.008)]},
+ ice_serpent:{name:'Serpente do Gelo',level:340,hp:4200000,atk:6800,def:950,xp:0,xpFromLevel:34,gold:[200000,320000],speed:3.8,aggro:42,respawn:300,atkCd:1.6,element:'ice',res:{ice:95,phys:42,fire:-40},breath:{kind:'ice',range:30,cd:2.4},onHit:{status:'slow',chance:.4,val:.5,dur:3},far:1,
+  drops:[D('mat_glacius_heart',1),D('mat_snow_scale',1,3,6),D('mat_ice_crystal',1,4,8),D('weapon_seraph_sword',.02),D('weapon_seraph_staff',.02),D('weapon_seraph_bow',.02),D('ring_behemoth',.04),D('potion_hp_mega',1,2,4),D('skin_drop_e',.08)]},
+ hydra:{name:'Hidra Abissal',level:150,hp:300000,atk:2800,def:340,xp:0,xpFromLevel:42,gold:[16000,32000],speed:4.0,aggro:20,respawn:70,atkCd:1.5,element:'phys',res:{ice:30,fire:-20},onHit:{status:'poison',chance:.5,val:60,dur:8},ranged:{range:17,keep:6,cd:1.9,kind:'venom'},far:1,
   drops:[D('mat_hydra_fang',.7,1,2),D('potion_hp_mega',.3),D('helm_abyss',.012),D('legs_abyss',.012),D('skin_drop_d',.01)]},
- seraph:{name:'Serafim Caído',level:230,hp:280000,atk:3300,def:360,xp:0,xpFromLevel:40,gold:[20000,40000],speed:5.5,aggro:28,respawn:80,element:'fire',res:{fire:70,shadow:-30},ranged:{range:25,keep:14,cd:2.0,kind:'holy'},onHit:{status:'burn',chance:.4,val:70,dur:5},far:1,
+ seraph:{name:'Serafim Caído',level:225,hp:280000,atk:3300,def:360,xp:0,xpFromLevel:40,gold:[20000,40000],speed:5.5,aggro:28,respawn:80,element:'fire',res:{fire:70,shadow:-30},ranged:{range:25,keep:14,cd:2.0,kind:'holy'},onHit:{status:'burn',chance:.4,val:70,dur:5},far:1,
   drops:[D('mat_seraph_feather',.7,1,2),D('weapon_seraph_staff',.006),D('weapon_seraph_sword',.006),D('weapon_seraph_bow',.006),D('potion_hp_mega',.3),D('skin_drop_d',.012)]},
- sandworm:{name:'Verme das Areias',level:250,hp:450000,atk:3800,def:420,xp:0,xpFromLevel:38,gold:[26000,52000],speed:6.0,aggro:22,respawn:80,atkCd:2.0,element:'phys',res:{phys:25,ice:-20},onHit:{status:'stun',chance:.25,val:0,dur:1.2},far:1,
+ sandworm:{name:'Verme das Areias',level:225,hp:450000,atk:3800,def:420,xp:0,xpFromLevel:38,gold:[26000,52000],speed:6.0,aggro:22,respawn:80,atkCd:2.0,element:'phys',res:{phys:25,ice:-20},onHit:{status:'stun',chance:.25,val:0,dur:1.2},far:1,
   drops:[D('mat_worm_chitin',.7,1,2),D('armor_abyss',.012),D('boots_abyss',.012),D('potion_hp_mega',.3),D('skin_drop_e',.012)]},
  behemoth:{name:'Behemoth Ancestral',level:300,hp:900000,atk:5200,def:600,xp:0,xpFromLevel:35,gold:[40000,90000],speed:5.2,aggro:24,respawn:120,atkCd:2.4,element:'phys',res:{phys:40,fire:30,ice:30},onHit:{status:'stun',chance:.3,val:0,dur:1.2},far:1,
   drops:[D('mat_behemoth_horn',.7,1,2),D('ring_behemoth',.01),D('weapon_seraph_sword',.01),D('weapon_seraph_bow',.01),D('weapon_seraph_staff',.01),D('potion_hp_mega',.4,1,2),D('skin_drop_e',.02)]},
@@ -266,6 +273,21 @@ function tradeExec(a,offA,b,offB){let e=tradeCheck(a,offA)||tradeCheck(b,offB);i
  if(!moved(offA,ca,cb)||!moved(offB,cb,ca))return{ok:false,err:'full'};
  a.inv=ca.inv;a.gold=ca.gold;b.inv=cb.inv;b.gold=cb.gold;logTx(a,{k:'trade2',gold:(offB.gold||0)-(offA.gold||0)});return{ok:true}}
 
+/* ---- depósito da troca (escrow): item/ouro colocado na troca SAI do inventário na hora e fica aqui; volta sozinho se a troca for cancelada ---- */
+function holdOf(st){if(!st.hold||typeof st.hold!=='object')st.hold={gold:0,items:[]};if(!Array.isArray(st.hold.items))st.hold.items=[];st.hold.gold=Math.max(0,Math.floor(+st.hold.gold||0));return st.hold}
+function holdAdd(st,uid){const h=holdOf(st),i=findUid(st,uid);if(i<0)return{ok:false,err:'item'};if(h.items.length>=10)return{ok:false,err:'max'};const e=st.inv[i];st.inv[i]=null;h.items.push(Object.assign({uid:e.uid,id:e.id,qty:e.qty},e.t?{t:e.t}:{}));return{ok:true}}
+function holdPutBack(st,it){const j=st.inv.findIndex(x=>!x);if(j>=0){st.inv[j]=Object.assign({uid:it.uid,id:it.id,qty:it.qty},it.t?{t:it.t}:{});return true}const r=addItem(st,it.id,it.qty,it.uid,it.t);return !!(r&&r.ok&&!(r.left>0))}
+function holdRemove(st,uid){const h=holdOf(st),i=h.items.findIndex(x=>x.uid===uid);if(i<0)return{ok:false,err:'item'};if(!holdPutBack(st,h.items[i]))return{ok:false,err:'full'};h.items.splice(i,1);return{ok:true}}
+function holdGold(st,n){const h=holdOf(st);n=Math.max(0,Math.min(st.gold+h.gold,Math.floor(+n||0)));st.gold+=h.gold-n;h.gold=n;return n}
+function holdReturn(st){const h=holdOf(st);st.gold=Math.min(CFG.goldCap,st.gold+h.gold);h.gold=0;h.items=h.items.filter(it=>!holdPutBack(st,it));return h.items.length===0}
+function holdOffer(st){const h=holdOf(st);return{gold:h.gold,items:h.items.map(x=>Object.assign({id:x.id,qty:x.qty},x.t?{t:x.t}:{}))}}
+function holdConsume(st){const h=holdOf(st),o={gold:h.gold,items:h.items.slice()};st.hold={gold:0,items:[]};return o}
+// cabe tudo isto na mochila (e no teto de ouro)? Simula num clone, sem mudar nada.
+function holdFits(st,items,gold){const c=JSON.parse(JSON.stringify({inv:st.inv,gold:st.gold}));for(const x of items||[]){const r=addItem(c,x.id,x.qty,null,x.t);if(!r||!r.ok||r.left>0)return false}return c.gold+(gold|0)<=CFG.goldCap}
+const holdEmpty=st=>{const h=st.hold;return !h||(!h.gold&&!(h.items&&h.items.length))};
+function cleanHold(o){const h={gold:0,items:[]};if(!o||typeof o!=='object')return h;h.gold=clampInt(o.gold,0,CFG.goldCap,0);
+ if(Array.isArray(o.items))for(const e of o.items.slice(0,10)){const c=cleanInst(e);if(c)h.items.push(c)}return h}
+
 /* ============ SKINS (cosmético) ============ */
 // 5 skins por classe (personagem) e 5 para cada: espada, cajado, arco, escudo, aljava, mascote. Viram itens negociáveis; ao USAR, a skin é liberada na conta.
 const SKIN_SLOTS={char_melee:'Aparência do Guerreiro',char_dist:'Aparência do Arqueiro',char_magic:'Aparência do Mago',sword:'Espada',staff:'Cajado',bow:'Arco',shield:'Escudo',quiver:'Aljava',pet:'Mascote do Mago'};
@@ -303,26 +325,19 @@ const SETS=[
  {k:'polar',n:'Gelo Polar',lv:36,m:'scale',c:'#8fc9e8',a:'#e6f6ff',at:'int',el:'ice',mobs:{icebat:'br',yeti:'hal'}},
  {k:'escama',n:'Escama Rubra',lv:45,m:'scale',c:'#b5382a',a:'#ffb347',at:'str',el:'fire',mobs:{dragon:'halbs',salamander:'ah',boss_ancient_dragon:'halbs'}},
  {k:'lobo',n:'Lobo Cinzento',lv:60,m:'leather',c:'#6b7078',a:'#c9ced6',at:'agi',mobs:{wolf:'albh',boss_medusa:'halbs'}},
- {k:'obsidiana',n:'Obsidiana',lv:150,m:'metal',c:'#2b2733',a:'#7a4cff',at:'str',mobs:{colossus:'als'}},
- {k:'brasa',n:'Brasa Viva',lv:170,m:'scale',c:'#d1481f',a:'#ffc23a',at:'str',el:'fire',mobs:{dragon_ember:'halbs'}},
- {k:'wyvern',n:'Escama do Vazio',lv:165,m:'scale',c:'#5b3a8f',a:'#c79bff',at:'agi',el:'shadow',mobs:{wyvern:'hbr'}},
- {k:'lich',n:'Lich Real',lv:180,m:'cloth',c:'#4d3a7a',a:'#9dffd0',at:'int',el:'shadow',mobs:{lich:'ahr'}},
- {k:'gelo_cristal',n:'Gelo Cristalino',lv:175,m:'crystal',c:'#bfe6f8',a:'#ffffff',at:'int',el:'ice',mobs:{ice_man:'alsb'}},
- {k:'glacial',n:'Glacial Profundo',lv:185,m:'scale',c:'#4f8fc4',a:'#bff0ff',at:'int',el:'ice',mobs:{dragon_frost:'halbs'}},
- {k:'tita',n:'Titã do Gelo',lv:195,m:'crystal',c:'#7fb8d8',a:'#e8f8ff',at:'vit',el:'ice',mobs:{frost_titan:'alsr'}},
- {k:'tempestade',n:'Tempestade',lv:200,m:'scale',c:'#4a5a8a',a:'#ffe14a',at:'agi',mobs:{dragon_storm:'halbs'}},
- {k:'hidra',n:'Hidra Abissal',lv:210,m:'scale',c:'#2f6b4a',a:'#9dff6a',at:'vit',el:'poison',mobs:{hydra:'halbs'}},
- {k:'neve',n:'Neve Eterna',lv:215,m:'crystal',c:'#f2f8ff',a:'#6fc8ff',at:'int',el:'ice',mobs:{dragon_ice:'halbs'}},
- {k:'serafim',n:'Serafim Caído',lv:230,m:'metal',c:'#e8d49a',a:'#fff3b0',at:'int',el:'fire',mobs:{seraph:'halbs'}},
- {k:'vazio',n:'Vazio Profundo',lv:240,m:'scale',c:'#2a1a4a',a:'#b56bff',at:'int',el:'shadow',mobs:{dragon_void:'halbs'}},
- {k:'dunas',n:'Dunas Antigas',lv:250,m:'bone',c:'#c9a35a',a:'#f0dca0',at:'str',mobs:{sandworm:'halbs'}},
- {k:'ancestral',n:'Dragão Ancestral',lv:270,m:'scale',c:'#c9962a',a:'#fff0a0',at:'str',el:'fire',mobs:{dragon_elder:'halbs'}},
- {k:'imperial',n:'Imperador do Gelo',lv:300,m:'crystal',c:'#d8f0ff',a:'#4fc8ff',at:'int',el:'ice',mobs:{ice_emperor:'halbsr'}},
- {k:'behemoth',n:'Behemoth',lv:300,m:'bone',c:'#8a6f4a',a:'#e0c080',at:'vit',mobs:{behemoth:'halbs'}},
+ // ---- conjuntos de Eldorath: UM por bioma; as peças se dividem entre os monstros do bioma (rank = lista do mais fraco ao mais forte) ----
+ {k:'obsidiana',n:'Obsidiana Viva',lv:200,m:'metal',c:'#2b2733',a:'#ff6a2a',at:'str',el:'fire',rank:['colossus','dragon_ember']},
+ {k:'hidra',n:'Hidra Abissal',lv:175,m:'scale',c:'#2f6b4a',a:'#9dff6a',at:'vit',el:'poison',rank:['hydra','lich']},
+ {k:'glacial',n:'Glacial Profundo',lv:225,m:'scale',c:'#4f8fc4',a:'#bff0ff',at:'int',el:'ice',rank:['ice_man','frost_titan','dragon_frost']},
+ {k:'serafim',n:'Serafim Caído',lv:225,m:'metal',c:'#e8d49a',a:'#fff3b0',at:'int',el:'fire',rank:['lich','seraph']},
+ {k:'dunas',n:'Dunas Antigas',lv:225,m:'bone',c:'#c9a35a',a:'#f0dca0',at:'str',rank:['wyvern','sandworm']},
+ {k:'tempestade',n:'Tempestade',lv:225,m:'scale',c:'#4a5a8a',a:'#ffe14a',at:'agi',rank:['wyvern','dragon_storm','dragon_void']},
+ {k:'imperial',n:'Imperador do Gelo',lv:300,m:'crystal',c:'#d8f0ff',a:'#4fc8ff',at:'int',el:'ice',rank:['dragon_frost','dragon_ice','ice_emperor','ice_warden','ice_golem','ice_serpent']},
+ {k:'behemoth',n:'Behemoth',lv:300,m:'bone',c:'#8a6f4a',a:'#e0c080',at:'vit',rank:['dragon_void','dragon_elder','behemoth']},
  // ---- conjuntos exclusivos de chefes (v45): cura ----
  // Sagrado: aura que cura aliados num raio de 100 m (só dos chefes mais fortes). Vínculo de Vida: parte do dano que você leva vira cura (chefes iniciais).
  // Só raridade Raro ou acima (Raro → Lendário); o efeito cresce com o fundo.
- {k:'sagrado',n:'Curandeiro Sagrado',lv:260,m:'cloth',c:'#fff4d6',a:'#7dffb0',at:'int',heal:'aura',mobs:{seraph:'halbs',sandworm:'halbs',dragon_elder:'halbs',behemoth:'halbs',ice_emperor:'halbs'}},
+ {k:'sagrado',n:'Curandeiro Sagrado',lv:260,m:'cloth',c:'#fff4d6',a:'#7dffb0',at:'int',heal:'aura',mobs:{dragon_elder:'halbs',behemoth:'halbs',ice_emperor:'halbs'}},
  {k:'vinculo',n:'Vínculo de Vida',lv:30,m:'leather',c:'#c94a6a',a:'#ffd0dc',at:'vit',heal:'vital',mobs:{boss_orc_warlord:'halbs',boss_ancient_dragon:'halbs'}}];   // itens de chefe: no máximo 2 chefes por conjunto
 // valores de cura por peça (fração; vezes o fator do fundo)
 const HEAL_W={aura:{helmet:.005,armor:.01,legs:.007,boots:.004,shield:.006,accessory:.006,necklace:.005},vital:{helmet:.008,armor:.016,legs:.011,boots:.006,shield:.012,accessory:.01,necklace:.008}};
@@ -338,9 +353,20 @@ const WDMG_PTS=[[1,4],[5,10],[14,22],[30,46],[45,82],[150,520],[220,880],[300,13
 const wdmgMin=lv=>{let i=0;while(i<WDMG_PTS.length-2&&lv>WDMG_PTS[i+1][0])i++;const a=WDMG_PTS[i],b=WDMG_PTS[i+1];return Math.max(1,Math.round(a[1]+(b[1]-a[1])*Math.max(0,Math.min(1,(lv-a[0])/(b[0]-a[0])))))};
 const SET_OF={},VAR_OF={};   // id da peça -> conjunto / classe da variante
 const lvR_=lv=>Math.min(40,5+Math.round(lv/8));
+// divisão das peças entre os monstros de um bioma (P = cai sempre com a chance normal, L = chance baixa, R = chance reduzida do monstro mais forte). k = cordão + mochila
+const RANK_PLAN={1:[{P:'halbsrk',W:1}],
+ 2:[{P:'hlbr',L:'k'},{P:'ask',R:'hlbr',W:1}],
+ 3:[{P:'br',L:'l'},{P:'hl',L:'ak'},{P:'ashlkr',R:'b',W:1}],
+ 4:[{P:'br',L:'l'},{P:'hl',L:'ak'},{P:'aklhr',L:'s'},{P:'halsk',R:'br',W:1}]};
+const SLOT_OF={h:'helmet',a:'armor',l:'legs',b:'boots',s:'shield',r:'accessory',k:'necklace'};
+{const rk=S_=>{const L=S_.rank.map(id=>MONSTERS[id].level),pl=RANK_PLAN[Math.min(4,S_.rank.length)];S_.plan={};S_.mobs={};S_.lvs={};
+  S_.rank.forEach((id,i)=>{const p=pl[Math.min(i,pl.length-1)],pp=S_.plan[id]||(S_.plan[id]={P:'',L:'',R:'',W:0});pp.P+=p.P||'';pp.L+=p.L||'';pp.R+=p.R||'';pp.W=pp.W||p.W||0;S_.mobs[id]=(S_.mobs[id]||'')+(p.P||'')+(p.L||'')+(p.R||'')});
+  for(const ch of 'halbsrk'){let m=1e9;S_.rank.forEach((id,i)=>{const q=S_.plan[id];if((q.P+q.L+q.R).includes(ch))m=Math.min(m,L[i])});if(m>=1e9)m=S_.lv;const sl=SLOT_OF[ch];S_.lvs[sl]=m;if(ch==='k')S_.lvs.backpack=m}};
+ for(const S_ of SETS)if(S_.rank)rk(S_)}
+const lvS=(S_,sl)=>S_.lvs&&S_.lvs[sl]||S_.lv,rarOf=l=>l>=250?'legendary':l>=150?'epic':l>=60?'epic':l>=24?'rare':l>=8?'uncommon':'common';
 {const defK=(lv)=>lv<=45?.75*lv:34+(lv-45)*1.1,W_={helmet:.53,armor:1,legs:.66,boots:.4,shield:.73,accessory:0};
- for(const S of SETS){const lv=S.lv,rar=lv>=250?'legendary':lv>=150?'epic':lv>=60?'epic':lv>=24?'rare':lv>=8?'uncommon':'common',nn=SET_NOUN[S.m];
-  S.items={};SET_SLOTS.forEach((sl,i)=>{const id=`set_${S.k}_${sl}`,col=sl==='helmet'?hexMix(S.c,'#ffffff',.14):sl==='armor'?S.c:sl==='legs'?hexMix(S.c,'#000000',.16):sl==='boots'?hexMix(S.c,'#000000',.32):sl==='shield'?hexMix(S.c,S.a,.45):S.a;
+ for(const S of SETS){const lv=S.lv,rar=rarOf(lv),nn=SET_NOUN[S.m];
+  S.items={};SET_SLOTS.forEach((sl,i)=>{const lv=lvS(S,sl),rar=rarOf(lv),id=`set_${S.k}_${sl}`,col=sl==='helmet'?hexMix(S.c,'#ffffff',.14):sl==='armor'?S.c:sl==='legs'?hexMix(S.c,'#000000',.16):sl==='boots'?hexMix(S.c,'#000000',.32):sl==='shield'?hexMix(S.c,S.a,.45):S.a;
    const who=Object.keys(S.mobs).filter(m=>S.mobs[m].split('').some(ch=>SC[ch]===sl)).map(m=>MONSTERS[m].name);
    const el=S.el,lvR=Math.min(40,5+Math.round(lv/8)),n=Math.ceil(lv/12)+1;
    add({id,name:`${nn[i]} de ${S.n}`,type:'armor',slot:sl,rarity:rar,reqLevel:lv,def:Math.max(1,Math.round(defK(lv)*W_[sl]*(sl==='accessory'?1:1.25))),cls:'melee',sell:Math.round(Math.max(6,(defK(lv)*W_[sl]||defK(lv)*.6))*lv*4)+10,
@@ -348,18 +374,18 @@ const lvR_=lv=>Math.min(40,5+Math.round(lv/8));
     desc:`Conjunto ${S.n}.${S.heal?(S.heal==='aura'?' Aura: cura aliados num raio de 100 m (só funciona com raridade Raro ou acima).':' Parte do dano que você leva vira cura (só funciona com raridade Raro ou acima).'):''}${S.g?' Cinza e translúcido, como os mortos-vivos.':''} Cai principalmente de: ${who.join(', ')||'—'}.`});
    S.items[sl]=id;SET_OF[id]=S});
   // cordão e mochila de cada conjunto (mochila = mais espaços no inventário)
-  {const who=Object.keys(S.mobs).map(m=>MONSTERS[m].name),el=S.el,n=Math.ceil(lv/14)+1;
+  {const who=Object.keys(S.mobs).map(m=>MONSTERS[m].name),el=S.el;{const lv=lvS(S,'necklace'),rar=rarOf(lv),n=Math.ceil(lv/14)+1;
    add({id:`set_${S.k}_necklace`,name:`Cordão de ${S.n}`,type:'armor',slot:'necklace',rarity:rar,reqLevel:lv,def:Math.max(1,Math.round(defK(lv)*.3)),cls:'melee',sell:Math.round(defK(lv)*lv*1.5)+10,icon:{k:'necklace',c:S.a},bonuses:{[S.at]:n,pre:Math.ceil(lv/40)},res:el?{[el]:lvR_(lv)}:{},ghost:!!S.g,set:S.k,...(S.heal?{tiered:true,tierMin:3,heal:{[S.heal]:HEAL_W[S.heal].necklace}}:{}),
     desc:`Cordão do conjunto ${S.n}. Cai de: ${who.join(', ')}.`});
-   S.items.necklace=`set_${S.k}_necklace`;SET_OF[S.items.necklace]=S;
-   add({id:`set_${S.k}_backpack`,name:`Mochila de ${S.n}`,type:'armor',slot:'backpack',rarity:rar,reqLevel:lv,def:0,cls:'melee',sell:Math.round(defK(lv)*lv*1.2)+10,icon:{k:'backpack',c:hexMix(S.c,S.a,.3)},bonuses:{},res:{},ghost:!!S.g,set:S.k,bag:BAG_BASE(lv),
+   S.items.necklace=`set_${S.k}_necklace`;SET_OF[S.items.necklace]=S}
+   {const lv=lvS(S,'backpack'),rar=rarOf(lv);add({id:`set_${S.k}_backpack`,name:`Mochila de ${S.n}`,type:'armor',slot:'backpack',rarity:rar,reqLevel:lv,def:0,cls:'melee',sell:Math.round(defK(lv)*lv*1.2)+10,icon:{k:'backpack',c:hexMix(S.c,S.a,.3)},bonuses:{},res:{},ghost:!!S.g,set:S.k,bag:BAG_BASE(lv),
     desc:`Mochila do conjunto ${S.n}: +${BAG_BASE(lv)} espaços no inventário (mais com raridade Raro ou acima). Cai de: ${who.join(', ')}.`});
-   S.items.backpack=`set_${S.k}_backpack`;SET_OF[S.items.backpack]=S}
+   S.items.backpack=`set_${S.k}_backpack`;SET_OF[S.items.backpack]=S}}
   // conjuntos completos por classe: arqueiro (gorro, casaco, calças, botas: velocidade) e mago (chapéu, manto, calças, botas: dano mágico). Escudo só no melee.
   S.vars={};const el=S.el;
   const VN={dist:{helmet:'Capuz Rastreador',armor:'Casaco Rastreador',legs:'Calças Ágeis',boots:'Botas Ágeis'},magic:{helmet:'Chapéu de Mago',armor:'Manto',legs:'Calças Arcanas',boots:'Botas Arcanas'}};
   for(const [cl,sfx] of[['dist','a'],['magic','m']])for(const sl of['helmet','armor','legs','boots']){
-   const id=`set_${S.k}_${sl}_${sfx}`,nm=VN[cl][sl]+' de '+S.n,base=Math.round(defK(lv)*W_[sl]),
+   const lv=lvS(S,sl),rar=rarOf(lv),id=`set_${S.k}_${sl}_${sfx}`,nm=VN[cl][sl]+' de '+S.n,base=Math.round(defK(lv)*W_[sl]),
     base0=sl==='helmet'?hexMix(S.c,'#ffffff',.14):sl==='armor'?S.c:sl==='legs'?hexMix(S.c,'#000000',.16):hexMix(S.c,'#000000',.32),
     col=hexMix(base0,cl==='dist'?'#7a9a4a':S.a,cl==='dist'?.28:.34),dm=cl==='dist'?.72:.55;
    const bon=cl==='dist'
@@ -379,6 +405,12 @@ const lvR_=lv=>Math.min(40,5+Math.round(lv/8));
      desc:`Arma do conjunto ${S.n}. Cai de: ${who.join(', ')}.`});S.wpn.push(id)}}
   // drops: peças específicas por monstro (boa chance) + as outras peças do conjunto (bem mais raras)
   const pc0=lv<30?.03:lv<100?.02:.013;   // metade da chance antiga: peças de conjunto são especiais
+  if(S.rank){   // conjunto de bioma: cada monstro larga só as peças do seu degrau (todas as classes); o mais forte larga as armas
+   for(const mid in S.plan){const m=MONSTERS[mid],q=S.plan[mid];if(!m)continue;m.drops=(m.drops||[]).filter(d=>{const it=ITEMS[d.id];return!(it&&it.set===S.k)});
+    const put=(chs,mul)=>{for(const ch of chs){const pcx=pc0*mul;if(ch==='k'){m.drops.push(D(S.items.necklace,pcx,1,1),D(S.items.backpack,pcx,1,1));continue}const sl=SC[ch];m.drops.push(D(S.items[sl],pcx,1,1));
+      if(['helmet','armor','legs','boots'].includes(sl))for(const sfx of['a','m'])m.drops.push(D(S.vars[sl+'_'+sfx],pcx,1,1))}};
+    put(q.P,1);put(q.L,.25);put(q.R,.4);if(q.W)for(const wid of S.wpn)m.drops.push(D(wid,pc0*.8,1,1))}
+   continue}
   for(const mid in S.mobs){const m=MONSTERS[mid];if(!m)continue;const prim=new Set(S.mobs[mid].split('').map(ch=>SC[ch])),pc=prim.size>3?pc0*.6:pc0;
    m.drops=(m.drops||[]).filter(d=>{const it=ITEMS[d.id];return!(it&&it.type==='armor'&&['helmet','armor','legs','boots','shield'].includes(it.slot)&&!it.set)});
    const boss5=prim.size>=5;for(const sl of SET_SLOTS)m.drops.push(D(S.items[sl],prim.has(sl)?pc:pc/9,1,1));
@@ -391,6 +423,68 @@ add({id:'necklace_cura',name:'Cordão da Cura',type:'armor',slot:'necklace',rari
 add({id:'necklace_healer',name:'Cordão do Curandeiro',type:'armor',slot:'necklace',rarity:'legendary',reqLevel:200,def:20,cls:'melee',sell:60000,icon:{k:'necklace',c:'#7dffe0'},bonuses:{int:12},res:{ice:20},tiered:true,tierMin:3,heal:{aura:.012},
  desc:'Cordão do gelo eterno: aura que cura aliados num raio de 100 m (mais com a raridade: Raro → Lendário). Cai do Imperador do Gelo.'});
 if(MONSTERS.ice_emperor){MONSTERS.ice_emperor.drops.push(D('necklace_cura',.08,1,1),D('necklace_healer',.08,1,1))}
+
+/* ================= BOSSES POR BIOMA + ITENS DE BOSS (v147) =================
+   • Cada bioma tem 1 boss de mundo. Quanto mais forte, mais RARO ele é (wb.chance = chance de surgir em cada ciclo) e mais demora.
+   • Mapa 1 (Arvelos): o boss mais forte (Medusa) larga os Cordões +10 (Corpo a corpo / Arqueiro / Mago, fundo roxo).
+     Os demais largam itens de CURA (curam os companheiros) e peças do Conjunto Vampiro (rouba vida só com ataques comuns).
+   • Mapa 2 (Eldorath): o boss mais forte larga os Cordões +20 (fundo amarelo); os demais largam as mesmas famílias de itens,
+     com chance bem maior de fundo amarelo e branco (tierBoost). */
+const ipol=(T,x)=>{if(x<=T[0][0])return T[0].slice(1);for(let i=1;i<T.length;i++){if(x<=T[i][0]){const a=T[i-1],b=T[i],t=(x-a[0])/(b[0]-a[0]);return a.slice(1).map((v,k)=>v+(b[k+1]-v)*t)}}return T[T.length-1].slice(1)};
+const BT=[[6,900,14,3,300,60,120,6],[14,2600,34,8,900,150,300,9],[20,4200,52,12,1600,260,480,15],[28,7000,80,20,2800,450,800,24],[36,11000,120,32,5000,800,1400,38],[50,22000,210,60,12000,2000,4000,60],[80,45000,260,70,20000,4000,7000,80]];   // nível → hp, atk, def, xp, ouro mín, ouro máx, minutos
+// ---- itens ----
+{const ATTR_OF={melee:'str',dist:'agi',magic:'int'},CLS_N={melee:'Guerreiro',dist:'Arqueiro',magic:'Mago'};
+ for(const[tag,plus,lvq,fix,col,boss]of[['p10',10,60,4,'#a06bff','a Medusa'],['p20',20,250,5,'#ffd24a','o Soberano Eterno do Gelo']])for(const cl of['melee','dist','magic']){
+  add({id:`neck_${tag}_${cl}`,name:`Cordão ${CLS_N[cl]} +${plus}`,type:'armor',slot:'necklace',rarity:fix===4?'epic':'ultra',reqLevel:lvq,def:Math.round(lvq*.4),cls:cl,sell:plus*4000,icon:{k:'necklace',c:hexMix(col,'#ffffff',{melee:.05,dist:.18,magic:.3}[cl])},tiered:true,tierFix:fix,bonuses:{[ATTR_OF[cl]]:plus},
+   desc:`Cordão +${plus}: +${plus} de ${{str:'força',agi:'agilidade',int:'inteligência'}[ATTR_OF[cl]]} (estilo ${CLS_N[cl].toLowerCase()}). Fundo ${fix===4?'roxo':'amarelo'} fixo. Cai só d${boss}.`})}
+ const VSL=['helmet','armor','legs','boots','shield'],VN={helmet:'Elmo',armor:'Armadura',legs:'Calças',boots:'Botas',shield:'Escudo'},VW={helmet:.006,armor:.012,legs:.008,boots:.004,shield:.008},DW={helmet:.53,armor:1,legs:.66,boots:.4,shield:.73};
+ const defK2=lv=>lv<=45?.75*lv:34+(lv-45)*1.1;
+ for(const[tag,lv,nm,col]of[['vamp1',40,'Vampiro','#a01030'],['vamp2',250,'Vampiro Ancestral','#6a0a3a']])for(const sl of VSL){
+  add({id:`${tag}_${sl}`,name:`${VN[sl]} ${tag==='vamp1'?'Vampírico':'Vampírico Ancestral'}`,type:'armor',slot:sl,rarity:lv>=250?'legendary':'epic',reqLevel:lv,def:Math.max(1,Math.round(defK2(lv)*DW[sl]*1.25)),cls:'melee',sell:Math.round(defK2(lv)*DW[sl]*lv*4)+10,icon:{k:sl,c:hexMix(col,'#000000',sl==='boots'?.3:sl==='legs'?.15:0)},tiered:true,tierMin:3,
+   bonuses:{vit:Math.ceil(lv/20)},vamp:+(VW[sl]*(lv>=250?1.3:1)).toFixed(4),
+   desc:`Conjunto ${nm}: rouba vida ao acertar ATAQUES COMUNS (não funciona com ataques especiais). O fundo do item aumenta o roubo.`})}
+ for(const[tag,lv]of[['1',30],['2',250]])for(const[k,cur,nm,vl]of[['vida','vital','Anel da Vida',.012],['aura','aura','Anel do Curandeiro',.008]]){
+  add({id:`heal_${k}${tag}`,name:nm+(tag==='2'?' Ancestral':''),type:'armor',slot:'accessory',rarity:lv>=250?'legendary':'epic',reqLevel:lv,def:Math.round(lv*.2),cls:'melee',sell:lv*lv*3+500,icon:{k:'accessory',c:hexMix(k==='vida'?'#ff7a9a':'#7dffe0',tag==='2'?'#ffffff':'#000000',.12)},tiered:true,tierMin:3,
+   bonuses:k==='vida'?{vit:Math.ceil(lv/15)}:{int:Math.ceil(lv/15)},heal:{[cur]:vl*(lv>=250?1.4:1)},
+   desc:k==='vida'?'Parte do dano que você leva vira cura (cura mais com o fundo do item).':'Aura que cura os companheiros num raio de 100 m (cura mais com o fundo do item).'})}
+}
+// ---- bosses ----
+const BOSS_BIO={goblin_king:'C',viper_queen:'K',bone_lord:'T',orc_warlord:'M',ancient_dragon:'Q',medusa:'J'};   // os 6 bosses antigos agora têm 1 bioma cada
+const BOSS_NEW=[   // [id, bioma, nome, nível, monstro de modelo, escala, cor, elemento, extra]
+ ['rat_king','A','Rei Rato',6,'rat',3.4,'#c9a062','phys'],['golden_naja','B','Naja Dourada',9,'cobra',3.6,'#e0b030','phys',{onHit:{status:'poison',chance:.4,val:2,dur:6}}],
+ ['slime_royal','W','Slime Real',12,'slime',3.4,'#ffd24a','phys'], ['spider_queen','E','Aranha-Rainha',22,'spider',3.2,'#7a3fa0','phys',{onHit:{status:'poison',chance:.5,val:3,dur:8}}],['zombie_colossus','D','Colosso Putrefato',24,'zombie',3.2,'#6f8f4a','phys'],
+ ['scorpion_emperor','G','Escorpião Imperador',30,'scorpion',3.4,'#d0a050','phys',{onHit:{status:'poison',chance:.5,val:4,dur:8}}],['forest_guardian','F','Guardião da Floresta Antiga',33,'golem',2.6,'#3d7a2e','phys'],
+ ['dune_ogre','I','Ogro das Dunas',37,'orc',2.2,'#d8bf79','phys'],['sand_pharaoh','H','Faraó das Dunas',40,'skel_knight',2.4,'#e8c25a','phys'],
+ ['magma_salamander','L','Salamandra Rubra',43,'salamander',2.9,'#ff5a2a','fire',{onHit:{status:'burn',chance:.4,val:8,dur:4},res:{fire:70,ice:-30}}],['canyon_titan','N','Titã do Cânion',46,'golem',2.7,'#c0693a','phys'],
+['soul_reaper','P','Ceifador de Almas',54,'ghostskel',2.6,'#9a7aff','shadow',{res:{shadow:40}}],
+ ['alpha_wolf','O','Lobo Alfa Ártico',58,'wolf',2.6,'#bfe8ff','ice',{res:{ice:60,fire:-30}}],['spectral_general','R','General Espectral',77,'ghost',2.6,'#7fd0ff','shadow',{res:{shadow:50}}]];
+const BOSS_FAR=[
+ ['frost_colossus','f1','Colosso Boreal',335,'frost_titan',3.0,null,'ice'],['lich_eternal','f2','Rei Lich Eterno',350,'lich',2.8,'#9a5aff','shadow'],
+ ['abyss_hydra','f4','Hidra Primordial',365,'hydra',2.8,'#2a8a6a','phys'],['void_wyvern_king','f5','Rei Wyvern do Vazio',380,'wyvern',2.7,'#6a3fb0','shadow'],
+ ['obsidian_king','f6','Rei de Obsidiana',395,'colossus',3.0,'#ff6a1a','fire'],['dragon_mother','f7','Mãe dos Dragões',410,'dragon_void',2.8,null,'shadow'],
+ ['behemoth_prime','f8','Behemoth Primordial',425,'behemoth',3.1,'#d0a050','phys'],['frost_sovereign','f3','Soberano Eterno do Gelo',445,'ice_emperor',3.8,null,'ice']];
+{for(const id in BOSS_BIO){const m=MONSTERS['boss_'+id];m.wb.bio=[BOSS_BIO[id]];m.wb.chance=id==='medusa'?.15:+Math.max(.15,1-(m.level-6)/74*.85).toFixed(2);m.biome=BOSS_BIO[id]}
+ for(const[id,bio,name,lv,from,sc,tint,el,ex]of BOSS_NEW){const v=ipol(BT,lv),gd=[Math.round(v[4]),Math.round(v[5])];
+  MONSTERS['boss_'+id]=Object.assign({name,level:lv,hp:Math.round(v[0]),atk:Math.round(v[1]),def:Math.round(v[2]),xp:Math.round(v[3]),gold:gd,speed:3.6+lv*.012,aggro:18+Math.min(8,lv/12),respawn:1e9,element:el,biome:bio,
+   wb:{tier:0,base:Math.round(v[6]),bio:[bio],chance:+Math.max(.15,1-(lv-6)/74*.85).toFixed(2),stomp:{r:Math.min(10,5+lv/14),mult:+(1.4+Math.min(.5,lv/160)).toFixed(2),cd:Math.max(6,Math.round(9-lv/25))}},
+   bvis:{from,sc,tint:tint||undefined},drops:[D(lv<20?'potion_hp_small':lv<50?'potion_hp_big':'potion_hp_big',1,2,4)]},ex||{})}
+ for(const[id,bio,name,lv,from,sc,tint,el]of BOSS_FAR){const top=id==='frost_sovereign';
+  MONSTERS['boss_'+id]={name,level:lv,hp:lv*lv*10,atk:Math.round(lv*lv*.052),def:lv*2,xp:0,xpFromLevel:8,gold:[lv*140,lv*300],speed:4.6,aggro:26,respawn:1e9,element:el,biome:bio,far:1,
+   res:el==='ice'?{ice:70,fire:-30}:el==='fire'?{fire:70,ice:-30}:el==='shadow'?{shadow:50}:{phys:30},tierBoost:12,
+   wb:{tier:0,base:Math.round(90+(lv-335)*.3),bio:[bio],chance:+(.25-(lv-335)*.0015).toFixed(3),stomp:{r:12,mult:1.9,cd:6}},
+   bvis:{from,sc,tint:tint||undefined},drops:[D('potion_hp_mega',1,2,4)]}}
+ // ordem de força (tier) por nível, separada por mapa
+ [Object.keys(MONSTERS).filter(k=>MONSTERS[k].wb&&!MONSTERS[k].far),Object.keys(MONSTERS).filter(k=>MONSTERS[k].wb&&MONSTERS[k].far)].forEach((L,mi)=>{L.sort((a,b)=>MONSTERS[a].level-MONSTERS[b].level).forEach((k,i)=>MONSTERS[k].wb.tier=i+1+(mi?20:0))});
+ for(const id in MONSTERS)MONSTERS[id].id=id;
+ // divisão dos itens
+ const m1=Object.keys(MONSTERS).filter(k=>MONSTERS[k].wb&&!MONSTERS[k].far).sort((a,b)=>MONSTERS[a].level-MONSTERS[b].level),top1=m1[m1.length-1];
+ const m2=Object.keys(MONSTERS).filter(k=>MONSTERS[k].wb&&MONSTERS[k].far).sort((a,b)=>MONSTERS[a].level-MONSTERS[b].level),top2=m2[m2.length-1];
+ const VSL2=['helmet','armor','legs','boots','shield'];
+ m1.filter(k=>k!==top1).forEach((k,i)=>{const m=MONSTERS[k];m.drops.push(D('vamp1_'+VSL2[i%5],.1,1,1),D(i%2?'heal_aura1':'heal_vida1',.08,1,1))});
+ m2.filter(k=>k!==top2).forEach((k,i)=>{const m=MONSTERS[k];m.drops.push(D('vamp2_'+VSL2[i%5],.3,1,1),D('vamp2_'+VSL2[(i+2)%5],.2,1,1),D(i%2?'heal_aura2':'heal_vida2',.25,1,1))});
+ for(const cl of['melee','dist','magic']){MONSTERS[top1].drops.push(D('neck_p10_'+cl,.25,1,1));MONSTERS[top2].drops.push(D('neck_p20_'+cl,.18,1,1))}
+ MONSTERS[top1].tierBoost=1.6;
+}
 // grupos de queda: 'skin_drop_a'..'e' viram todas as skins do nível 1..5 (chance dividida)
 for(const k in MONSTERS){const m=MONSTERS[k];if(!m.drops)continue;const out=[];
  for(const d of m.drops){const mm=/^skin_drop_([a-e])$/.exec(d.id);if(!mm){out.push(d);continue}const n=mm[1].charCodeAt(0)-96,lst=SKINS.filter(q=>q.n===n);for(const q of lst)out.push(D(q.id,d.chance/lst.length,1,1))}
@@ -410,7 +504,7 @@ const SKILLS={
  dist:[
   {id:'triple',name:'Tripla',ic:'🏹',req:3,mana:10,cd:4,mult:.95,el:'phys',desc:'Três flechas em leque.'},
   {id:'pierce',name:'Flecha Perfurante',ic:'📍',req:8,mana:12,cd:6,mult:1.6,range:26,pierce:4,el:'phys',desc:'Atravessa até 4 alvos em linha. Segure até 3 s para carregar: quanto mais carga, mais dano (até 3× um ataque básico), alcance e alvos atravessados.'},
-  {id:'rain',name:'Chuva de Flechas',ic:'🌧️',req:14,mana:20,cd:12,mult:.7,radius:5,ticks:5,el:'phys',desc:'Cobre uma área com flechas por 2,5s.'}],
+  {id:'rain',name:'Chuva de Flechas',ic:'🌧️',req:14,mana:20,cd:12,mult:.7,radius:6,ticks:5,el:'phys',desc:'Alcance de 30 m. Cobre o alvo (ou o inimigo mais perto da mira) com flechas por 2,5s; a chuva acompanha o alvo e a maioria das flechas cai em cima dos inimigos.'}],
  magic:[
   {id:'fire',name:'Orbe de Brasas',ic:'🔥',req:3,mana:14,cd:3.6,mult:2,radius:3.6,el:'fire',status:{id:'burn',dur:4,dmgPct:.15},desc:'Esfera de fogo que explode e queima.'},
   {id:'frost',name:'Nova Gélida',ic:'❄️',req:8,mana:18,cd:9,mult:1.1,radius:5.2,el:'ice',status:{id:'slow',dur:3,val:.55},desc:'Segure para carregar: mais dano, área e lentidão. 100% congela por 2s e o gelo se quebra.'},
@@ -433,9 +527,9 @@ function cureStatus(t,id){if(t.statuses)t.statuses=t.statuses.filter(x=>x.id!==i
 
 /* ============ LOJAS ============ */
 const SHOPS={
- merchant:{npc:'merchant',name:'Lojista',stock:[['potion_hp_small',20],['potion_mp_small',20],['potion_hp_med',70],['potion_mp_med',70],['potion_hp_big',200],['potion_mp_big',200],['antidote',40],['scroll_town',80],
+ merchant:{npc:'merchant',name:'Lojista',stock:[['potion_hp_small',20],['potion_mp_small',20],['potion_hp_med',70],['potion_mp_med',70],['potion_hp_big',200],['potion_mp_big',200],['antidote',40],['arrow',25],['scroll_town',80],
   ['armor_tunic',10],['armor_leather',150],['helm_leather_cap',60],['legs_leather',70],['boots_leather',50],['shield_wood',90]]},
- smith:{npc:'smith',name:'Ferreiro Bruno',stock:[['weapon_wood_dagger',20],['weapon_short_bow',20],['weapon_twig_wand',20],['weapon_iron_sword',150],['weapon_long_bow',150],['weapon_oak_wand',150],
+ smith:{npc:'smith',name:'Ferreiro Bruno',stock:[['weapon_wood_dagger',20],['weapon_short_bow',20],['weapon_twig_wand',20],['weapon_iron_sword',150],['weapon_long_bow',150],['weapon_oak_wand',150],['arrow',25],
   ['helm_iron',300],['boots_iron',250]]}
 };
 // Economia: os NPCs só vendem o básico. Equipamentos melhores, materiais e skins vêm dos monstros e circulam entre os jogadores (Mercado e Troca).
@@ -468,6 +562,14 @@ const levelXp=l=>l<=60?Math.round(CFG.xpBase*Math.pow(CFG.xpGrow,l-1)):Math.roun
    else if(it.type==='consumable'&&e.chance<1)e.chance=+(e.chance*.5).toFixed(3)}
   m.drops.push(...add)}}
 for(const k in MONSTERS){const m=MONSTERS[k];if(m.xpFromLevel)m.xp=Math.max(1,Math.round(levelXp(m.level)/m.xpFromLevel))}
+// vida dos monstros reescalada para a compressão de dano: mesmo tempo para matar com a construção de referência (skill = nível do mob), mas com números bem menores
+const DMG_K=100,DMG_P=.5,dmgCurve=r=>r<=DMG_K?r:DMG_K*Math.pow(r/DMG_K,DMG_P);
+const RREF=[[1,6],[5,21],[10,30],[25,94],[45,211],[60,395],[150,2484],[180,3599],[200,4438],[250,7874],[270,9166],[300,11269]];
+const rRef=lv=>{if(lv<=RREF[0][0])return RREF[0][1];for(let i=1;i<RREF.length;i++){const a=RREF[i-1],b=RREF[i];if(lv<=b[0]){const t=(lv-a[0])/(b[0]-a[0]);return Math.exp(Math.log(a[1])+t*(Math.log(b[1])-Math.log(a[1])))}}const z=RREF[RREF.length-1];return z[1]*Math.pow(lv/z[0],1.1)};
+for(const k in MONSTERS){const m=MONSTERS[k],r=rRef(m.level);m.hp=Math.max(10,Math.round(m.hp*dmgCurve(r)/r));
+ if(m.level>=100){const cap=m.boss||m.wb?150:k==='ice_serpent'?420:(k==='ice_emperor'||k==='behemoth'||k==='dragon_elder')?110:60,ttk=m.hp/(dmgToMonster(r,m,'phys')*1.45)*.53;   // tempo de referência (s) para quem tem skill = nível do mob
+  if(ttk>cap)m.hp=Math.round(m.hp*cap/ttk)}}
+
 const skillNeed=l=>Math.round(CFG.skillBase*Math.pow(CFG.skillGrow,l));
 function newCharacter(name){
  const st={v:CFG.version,name:name||'Herói',level:1,xp:0,gold:30,points:0,attrs:{str:CFG.baseAttr,agi:CFG.baseAttr,int:CFG.baseAttr,vit:CFG.baseAttr,pre:CFG.baseAttr},
@@ -475,7 +577,7 @@ function newCharacter(name){
   inv:new Array(CFG.invSlots).fill(null),bank:[],bankGold:0,eq:{},quests:{active:{},done:{}},daily:null,kills:0,deaths:0,txlog:[]};
  for(const s of SLOTS)st.eq[s]=null;
  for(const id of['weapon_wood_dagger','weapon_short_bow','weapon_twig_wand','armor_tunic'])st.eq[ITEMS[id].slot]={uid:mint(),id,qty:1};
- addItem(st,'potion_hp_small',3);addItem(st,'potion_mp_small',2);addItem(st,'scroll_town',1);
+ addItem(st,'potion_hp_small',3);addItem(st,'potion_mp_small',2);addItem(st,'scroll_town',1);addItem(st,'arrow',300);st.ag=1;
  const S=stats(st);st.hp=S.maxHp;st.mp=S.maxMp;return st}
 
 /* ============ ATRIBUTOS DERIVADOS ============ */
@@ -490,6 +592,8 @@ const INV_MAX=CFG.invSlots+40;
 const bagExtra=e=>{const d=e&&ITEMS[e.id];return d&&d.bag?Math.min(40,Math.round(d.bag*tierMul(e))):0};
 const invTarget=st=>CFG.invSlots+bagExtra(st.eq.backpack);
 function fitInv(st){const n=invTarget(st);if(st.inv.length<n){while(st.inv.length<n)st.inv.push(null);return true}if(st.inv.length>n){for(let i=n;i<st.inv.length;i++)if(st.inv[i])return false;st.inv.length=n}return true}
+const VAMP_TF={1:1,2:1,3:1,4:1.25,5:1.6,6:2},VAMP_CAP=.15;
+function vampSum(st){let v=0;for(const sl of SLOTS){const e=st.eq[sl],d=e&&ITEMS[e.id];if(d&&d.vamp)v+=d.vamp*(VAMP_TF[tierOf(e)]||1)}return Math.min(VAMP_CAP,v)}
 function stats(st){const b=bonusSum(st),A={};for(const k of['str','agi','int','vit','pre'])A[k]=st.attrs[k]+b[k];
  const lv=st.level,maxHp=40+A.vit*6+lv*8,maxMp=16+A.int*3+lv*4;
  const atkSpeed=Math.min(CFG.atkSpeedCap,1+A.agi*.008+b.atkSpeed);
@@ -500,11 +604,17 @@ function stats(st){const b=bonusSum(st),A={};for(const k of['str','agi','int','v
  const res={};for(const r in b.res)res[r]=Math.min(CFG.resCap,b.res[r]);
  const weapon={};for(const s of STYLES){const e=st.eq['weapon'+cap(s)],d=e&&ITEMS[e.id],w=d?{min:Math.round(d.dmg.min*tierMul(e)),max:Math.round(d.dmg.max*tierMul(e)),atkMsBase:d.atkMs,uid:e.uid,id:e.id}:{min:FISTS.min,max:FISTS.max,atkMsBase:FISTS.atkMs,uid:null,id:null};
   w.atkMs=Math.max(CFG.minAtkMs,Math.round(w.atkMsBase/atkSpeed));weapon[s]=w}
- return{A,maxHp,maxMp,def,atkSpeed,crit,dodge,moveMul,res,luck:b.luck,magDmg:b.magDmg,weapon,heal:healSum(st)}}
+ return{A,maxHp,maxMp,def,atkSpeed,crit,dodge,moveMul,res,luck:b.luck,magDmg:b.magDmg,weapon,heal:healSum(st),vamp:vampSum(st)}}
+// parte do dano que vem da skill (a arma só soma um adicional pequeno): curva própria, bem mais suave depois da skill 300
+const SKP=[[1,4],[5,1.8],[14,1.5],[30,1.2],[45,1.7],[60,2.5],[150,4.2],[300,5.4]];
+const skillPart=sk=>{if(sk>300)return 300*5.4+(sk-300);let i=0;while(i<SKP.length-2&&sk>SKP[i+1][0])i++;const A=SKP[i],B=SKP[i+1],c=A[1]+(B[1]-A[1])*Math.max(0,Math.min(1,(sk-A[0])/(B[0]-A[0])));return sk*c}
 function rollHit(st,style,mult,rng){const S=stats(st),w=S.weapon[style],base=w.min+Math.floor(rng()*(w.max-w.min+1));
- let raw=(base*(1+S.A[STYLE_ATTR[style]]*.02)+st.sk[style].lv*.5+st.level*.2)*(mult||1);const crit=rng()<S.crit;if(style==='magic')raw*=1+(S.magDmg||0);if(crit)raw*=CFG.critMult;return{raw,crit,base}}
+ let raw=((base+skillPart(st.sk[style].lv)+st.level*.2)*(1+S.A[STYLE_ATTR[style]]*.02))*(mult||1);const crit=rng()<S.crit;if(style==='magic')raw*=1+(S.magDmg||0);if(crit)raw*=CFG.critMult;return{raw,crit,base}}
 function elementMult(mon,el){const r=(mon.res&&mon.res[el])||0;return 1-r/100}
-function dmgToMonster(raw,mon,el){const m=elementMult(mon,el||'phys');if(m<=0)return 0;return Math.max(1,Math.round(raw*m*100/(100+mon.def*CFG.mitigationK_monster)))}
+// a habilidade (nível da skill) contra o nível do monstro: skill ≈ nível do mob = dano normal; menos = mais difícil; mais = mais fácil (de 0,7× a ~3,7×)
+const skillEdge=(sk,ml)=>Math.pow(Math.max(.7,Math.min(3,(sk||1)/Math.max(1,ml||1))),1.2);
+// compressão do dano contra monstros: até DMG_K o dano é o próprio; acima disso cresce devagar (raiz), para que skill 500 não passe de ~1000 por golpe
+function dmgToMonster(raw,mon,el){const m=elementMult(mon,el||'phys');if(m<=0)return 0;return Math.max(1,Math.round(dmgCurve(raw)*m*100/(100+mon.def*CFG.mitigationK_monster)))}
 function monsterHit(st,mon,rng,S){S=S||stats(st);if(rng()<S.dodge)return{dodged:true,dmg:0,element:mon.element};
  const el=mon.element||'phys',raw=mon.atk*(.6+.4*rng()),res=el==='phys'?0:(S.res[el]||0);
  return{dodged:false,element:el,dmg:Math.max(1,Math.round(raw*(1-res/100)*100/(100+S.def*CFG.mitigationK_player)))}}
@@ -591,10 +701,13 @@ function dropChance(entry,ctx){const p=entry.chance;if(p>=1)return 1;
  const rar=entry.rarity||(ITEMS[entry.id]&&ITEMS[entry.id].rarity);
  for(const e of ctx.events||[]){const ev=EVENTS[e];if(!ev)continue;if(ev.only&&!ev.only.includes(ctx.monsterId))continue;if(ev.mult&&ev.mult[rar])mult*=ev.mult[rar]}
  return Math.min(1,p*mult,p*CFG.dropChanceCapRel*(1+CFG.luckMaxRel))}
+const POTION_DROP_MIN_LV=100,isPotion=id=>{const f=ITEMS[id]&&ITEMS[id].fx;return!!(f&&(f.healPct||f.manaPct))};
 function rollDrops(monsterId,ctx){ctx=Object.assign({},ctx);const mon=MONSTERS[monsterId];if(!mon)return{gold:0,items:[]};const rng=ctx.rng||Math.random;ctx.monsterId=monsterId;
  const gold=mon.gold[0]+Math.floor(rng()*(mon.gold[1]-mon.gold[0]+1)),items=[];
+
  for(const e of mon.drops){if(e.cond&&e.cond.event&&!(ctx.events||[]).includes(e.cond.event))continue;
-  if(rng()<dropChance(e,ctx)){const q=e.min+Math.floor(rng()*(e.max-e.min+1)),o={id:e.id,qty:q};if(needsTier(ITEMS[e.id]))o.t=rollTier(rng,(mon.boss||mon.wb)?1.6:1,ITEMS[e.id].tierMin);items.push(o)}}
+  if(isPotion(e.id)&&(mon.level||0)<POTION_DROP_MIN_LV)continue;   // monstros abaixo do nível 100 não derrubam poções
+  if(rng()<dropChance(e,ctx)){const q=e.min+Math.floor(rng()*(e.max-e.min+1)),o={id:e.id,qty:q};if(needsTier(ITEMS[e.id]))o.t=rollTier(rng,(mon.boss||mon.wb)?(mon.tierBoost||1.6):1,ITEMS[e.id].tierMin);items.push(o)}}
  return{gold,items}}
 function simulateDrops(monsterId,n,rng,ctx){const counts={},rolls=Object.assign({},ctx,{rng});let gold=0;
  for(let i=0;i<n;i++){const r=rollDrops(monsterId,rolls);gold+=r.gold;for(const it of r.items)counts[it.id]=(counts[it.id]||0)+it.qty}
@@ -672,7 +785,12 @@ function dailyEvent(st,ev){const d=st.daily;if(!d||!d.q)return[];const done=[];
  return done}
 function dailyGrant(st,r){
  st.gold=Math.min(CFG.goldCap,st.gold+(r.gold|0));if(r.xp)gainXp(st,r.xp);for(const[id,n]of r.items)if(ITEMS[id])addItem(st,id,n);return true}
-function dailyClaim(st,which){const d=st.daily;if(!d)return{ok:false,err:'none'};if(freeSlots(st)<5)return{ok:false,err:'full'};
+function dailyFits(st,items){const need={};for(const[id,n]of items||[])need[id]=(need[id]||0)+n;
+ let free=st.inv.filter(e=>!e).length;const parts={};for(const e of st.inv)if(e&&stackMax(e.id)>1)parts[e.id]=(parts[e.id]||0)+(stackMax(e.id)-e.qty);
+ for(const id in need){let n=need[id];const p=Math.min(n,parts[id]||0);n-=p;if(n>0){const m=stackMax(id),sl=Math.ceil(n/m);free-=sl;if(free<0)return false}}return true}
+function dailyClaim(st,which){const d=st.daily;if(!d)return{ok:false,err:'none'};
+ {let it=[];if(which==='login'){if(!d.claimed){const gap=dayNum(d.key)-dayNum(d.last),str=(d.last&&gap===1)?d.streak+1:1;it=loginRewardFor((str-1)%7+1,st.level).items}}else if(which==='bonus')it=[['potion_hp_big',3],['potion_mp_small',5]];else{const x=d.q[which|0];if(x)it=x.r.items}
+  if(!dailyFits(st,it))return{ok:false,err:'full'}}
  if(which==='login'){if(d.claimed)return{ok:false,err:'done'};const gap=dayNum(d.key)-dayNum(d.last);d.streak=(d.last&&gap===1)?d.streak+1:1;d.last=d.key;d.claimed=true;const day=(d.streak-1)%7+1,r=loginRewardFor(day,st.level);dailyGrant(st,r);return{ok:true,reward:r,day,streak:d.streak}}
  if(which==='bonus'){if(d.bonus||!d.q.length||!d.q.every(x=>x.c))return{ok:false,err:'notyet'};d.bonus=true;const r={gold:Math.round((150+st.level*22)*3),xp:Math.round(levelXp(st.level)*.15),items:[['potion_hp_big',3],['potion_mp_small',5]]};dailyGrant(st,r);return{ok:true,reward:r}}
  const x=d.q[which|0];if(!x)return{ok:false,err:'none'};if(x.c)return{ok:false,err:'done'};if(x.p<x.n)return{ok:false,err:'notyet'};x.c=true;dailyGrant(st,x.r);return{ok:true,reward:x.r}}
@@ -684,13 +802,13 @@ const clampInt=(v,a,b,d)=>{v=Math.floor(Number(v));return Number.isFinite(v)?Mat
 function cleanInst(e){if(!e||!ITEMS[e.id])return null;const q=clampInt(e.qty,1,stackMax(e.id),1);const uid=typeof e.uid==='string'&&/^u\d+$/.test(e.uid)?e.uid:mint();floorUid(uid);const o={uid,id:e.id,qty:q};if(needsTier(ITEMS[e.id])&&(e.t|0)>=1&&(e.t|0)<=6)o.t=e.t|0;return o}
 function deserialize(o){if(!o||typeof o!=='object'||!o.level)return null;const st=newCharacter(o.name);
  st.inv=new Array(CFG.invSlots).fill(null);for(const s of SLOTS)st.eq[s]=null;st.txlog=[];
- st.level=clampInt(o.level,1,999,1);st.xp=clampInt(o.xp,0,1e15,0);
+ st.level=clampInt(o.level,1,1000,1);st.xp=clampInt(o.xp,0,1e15,0);
  if(Array.isArray(o.market)){st.market=o.market.slice(0,MARKET_MAX).filter(l=>l&&ITEMS[l.id]).map(l=>({lid:typeof l.lid==='string'&&/^u\d+$/.test(l.lid)?l.lid:mint(),id:l.id,qty:clampInt(l.qty,1,stackMax(l.id),1),price:clampInt(l.price,1,1e9,1)}));st.market.forEach(l=>floorUid(l.lid))}
  if(o.skins&&typeof o.skins==='object'){const S=skinState(st);for(const id in (o.skins.have||{}))if(ITEMS[id]&&ITEMS[id].type==='skin')S.have[id]=true;for(const sl in (o.skins.eq||{})){const id=o.skins.eq[sl];if(ITEMS[id]&&ITEMS[id].type==='skin'&&ITEMS[id].skin.slot===sl&&S.have[id])S.eq[sl]=id}}
-st.rst=clampInt(o.rst,0,99,0);st.gold=clampInt(o.gold,0,CFG.goldCap,0);st.points=clampInt(o.points,0,9999,0);
+st.ag=o.ag?1:0;st.rst=clampInt(o.rst,0,99,0);st.gold=clampInt(o.gold,0,CFG.goldCap,0);st.points=clampInt(o.points,0,9999,0);
  for(const k of['str','agi','int','vit','pre'])st.attrs[k]=clampInt(o.attrs&&o.attrs[k],1,999,CFG.baseAttr);
- for(const k of['melee','dist','magic','def']){const s=(o.sk&&o.sk[k])||{};st.sk[k]={lv:clampInt(s.lv,1,999,1),xp:clampInt(s.xp,0,1e9,0)}}
- st.daily=cleanDaily(o.daily);st.mode=STYLES.includes(o.mode)?o.mode:'melee';st.kills=clampInt(o.kills,0,1e9,0);st.deaths=clampInt(o.deaths,0,1e9,0);
+ for(const k of['melee','dist','magic','def']){const s=(o.sk&&o.sk[k])||{};st.sk[k]={lv:clampInt(s.lv,1,1000,1),xp:clampInt(s.xp,0,1e9,0)}}
+ st.daily=cleanDaily(o.daily);st.hold=cleanHold(o.hold);st.mode=STYLES.includes(o.mode)?o.mode:'melee';st.kills=clampInt(o.kills,0,1e9,0);st.deaths=clampInt(o.deaths,0,1e9,0);
  const seen=new Set();
  {const bp=cleanInst(o.eq&&o.eq.backpack),bd=bp&&ITEMS[bp.id].slot==='backpack'?bagExtra(bp):0;st.inv=new Array(CFG.invSlots+bd).fill(null)}
  (o.inv||[]).slice(0,st.inv.length).forEach((e,i)=>{const c=cleanInst(e);if(c&&!seen.has(c.uid)){seen.add(c.uid);st.inv[i]=c}});
@@ -698,7 +816,8 @@ st.rst=clampInt(o.rst,0,99,0);st.gold=clampInt(o.gold,0,CFG.goldCap,0);st.points
  for(const id in((o.quests&&o.quests.active)||{}))if(QUESTS[id]){const p=o.quests.active[id].p;st.quests.active[id]={p:QUESTS[id].obj.map((_,i)=>clampInt(p&&p[i],0,9999,0))}}
  for(const id in((o.quests&&o.quests.done)||{}))if(QUESTS[id])st.quests.done[id]=true;
  st.bankGold=clampInt(o.bankGold,0,1e12,0);st.bank=[];(o.bank||[]).slice(0,BANK_SLOTS).forEach(e=>{const c=cleanInst(e);if(c&&!seen.has(c.uid)){seen.add(c.uid);st.bank.push(c)}});
- (o.txlog||[]).slice(-CFG.txLogMax).forEach(t=>st.txlog.push(t));
+  (o.txlog||[]).slice(-CFG.txLogMax).forEach(t=>st.txlog.push(t));
+ if(!st.ag){const r=addItem(st,'arrow',100);if(r.added>0)st.ag=1}   // presente único: personagens antigos ganham 100 flechas quando as flechas viraram munição
  const S=stats(st);st.hp=clampInt(o.hp,1,S.maxHp,S.maxHp);st.mp=clampInt(o.mp,0,S.maxMp,S.maxMp);return st}
 
 /* ============ CHAT ============ */
@@ -729,8 +848,23 @@ function filterChat(t){return chatMask(cleanChat(t)).trim()}
 function makeLimiter(max,windowMs){const q=[];return now=>{while(q.length&&now-q[0]>windowMs)q.shift();if(q.length>=max)return false;q.push(now);return true}}
 
 /* ============ VALIDAÇÃO DOS DADOS ============ */
+// ATAQUE DAS ARMAS (à la Rucoi): o adicional da arma é pequeno; quem faz o grosso do dano é a skill do jogador.
+// Até o nível 99 os itens não têm fundo colorido: cada degrau de nível sobe +4 (inicial 2 · 6 · 10 · 14 …).
+// A partir do nível 100 (itens com fundo) cada degrau sobe só +2. Armas do mesmo nível têm o mesmo ataque.
+{const lvs=[...new Set(Object.values(ITEMS).filter(d=>d.type==='weapon'&&d.dmg).map(d=>d.reqLevel||0))].sort((x,y)=>x-y),AT={};let cur=-2;
+ for(const l of lvs){cur+=l<100?4:2;AT[l]=cur}
+ // raridade dentro do mesmo nível (só armas de ataque e escudos; armaduras sempre sobem com o mob):
+// o item mais raro (lendário) de um degrau tem a mesma força do item simples do degrau de cima; os intermediários ficam no meio do caminho
+ const RW={common:0,uncommon:.2,rare:.4,epic:.7,ultra:.85,legendary:1},rwOf=r=>RW[r]||0,exp=l=>rwOf(l>=250?'legendary':l>=60?'epic':l>=24?'rare':l>=8?'uncommon':'common');
+ const off=(d,base,step)=>{const bw=Math.min(base,exp(d.reqLevel||0)),w=rwOf(d.rarity);return w>bw&&bw<1?(w-bw)/(1-bw)*step:0};
+ const gmin={};for(const id in ITEMS){const d=ITEMS[id];if(d.type!=='weapon'||!d.dmg)continue;const l=d.reqLevel||0;gmin[l]=Math.min(gmin[l]===undefined?9:gmin[l],rwOf(d.rarity))}
+ for(const id in ITEMS){const d=ITEMS[id];if(d.type!=='weapon'||!d.dmg)continue;const l=d.reqLevel||0,i=lvs.indexOf(l),step=i<lvs.length-1?AT[lvs[i+1]]-AT[l]:2,A=AT[l]+Math.round(off(d,gmin[l],step));d.dmg={min:Math.max(1,Math.floor(A*.85)),max:Math.max(2,Math.ceil(A*1.15))}}
+ {const sh=Object.values(ITEMS).filter(d=>d.type==='armor'&&d.slot==='shield'&&d.def),L=[...new Set(sh.map(d=>d.reqLevel||0))].sort((x,y)=>x-y),sb={},sg={};
+  for(const l of L){const g=sh.filter(d=>(d.reqLevel||0)===l);sb[l]=Math.min(...g.map(d=>d.def));sg[l]=Math.min(...g.map(d=>rwOf(d.rarity)))}
+  for(const d of sh){const l=d.reqLevel||0,i=L.indexOf(l),nx=i<L.length-1?sb[L[i+1]]:sb[l]*1.1,o=off(d,sg[l],nx-sb[l]);if(o>0)d.def=Math.round(sb[l]+o)}}}
 function validateData(){const e=[];
  for(const id in MONSTERS)for(const d of MONSTERS[id].drops){if(!ITEMS[d.id])e.push('drop inválido '+id+':'+d.id);if(!(d.chance>0&&d.chance<=1))e.push('chance inválida '+id+':'+d.id);if(d.min>d.max||d.min<1)e.push('qtd inválida '+id+':'+d.id)}
+ for(const id in MONSTERS){const m=MONSTERS[id];if(m.boss||m.wb)continue;for(const d of m.drops){const it=ITEMS[d.id];if(it&&it.reqLevel>m.level+10)e.push('drop acima do nível do monstro '+id+'(Nv'+m.level+'):'+d.id+'(Nv'+it.reqLevel+')')}}
  for(const s in SHOPS)for(const[id,p]of SHOPS[s].stock){if(!ITEMS[id])e.push('loja '+s+' item inválido '+id);else if(p<=ITEMS[id].sell)e.push('arbitragem '+s+':'+id)}
  for(const id in QUESTS){const q=QUESTS[id];if(q.after&&!QUESTS[q.after])e.push('quest after '+id);for(const o of q.obj){if(o.mon&&!MONSTERS[o.mon])e.push('quest mon '+id);if(o.item&&!ITEMS[o.item])e.push('quest item '+id)}for(const[i]of q.reward.items||[])if(!ITEMS[i])e.push('quest reward '+id+':'+i)}
  for(const id in ITEMS){const d=ITEMS[id];if(d.type==='weapon'&&(!d.dmg||d.dmg.min>d.dmg.max))e.push('arma inválida '+id);if(d.type==='armor'&&!SLOTS.includes(d.slot))e.push('slot inválido '+id);if(!RARITY[d.rarity])e.push('raridade '+id)}
@@ -741,7 +875,7 @@ function validateData(){const e=[];
    Caveiras: branca (atacou quem estava limpo, 2 min), amarela/vermelha/preta/dupla preta pelas mortes recentes (cada uma vale 3 h).
    Quem morre em PvP perde só ouro (nunca itens nem nível); quanto pior a caveira de quem matou, maior a perda. */
 const PVP={lockMs:12e3,whiteMs:120e3,killMs:3*3600e3,reach:32,hitCd:140};
-const PVP_TOWNS=[[0,0,34],[960,960,68],[5600,0,68]];   // [x,z,meio-lado] das vilas (zonas seguras), com folga de 5 m
+const PVP_TOWNS=[[0,0,34],[960,960,68],[1700,960,68]];   // [x,z,meio-lado] das vilas (zonas seguras), com folga de 5 m
 function pvpInTown(x,z){for(const t of PVP_TOWNS)if(Math.max(Math.abs(x-t[0]),Math.abs(z-t[1]))<t[2]+5)return true;return false}
 function pvpLevelOk(a,b){a=Math.max(1,a|0);b=Math.max(1,b|0);return Math.abs(a-b)<=Math.max(10,Math.ceil(Math.max(a,b)*.3))}
 const PVP_SKULLS=['','white','yellow','red','black','dblack'];
@@ -752,8 +886,8 @@ function pvpSkull(rank){return PVP_SKULLS[Math.max(0,Math.min(5,rank|0))]}
 function pvpGoldLoss(rank){const i=PVP_SKULL_INFO[pvpSkull(rank)];return i?i.loss:.1}
 function pvpCurse(rank){const i=PVP_SKULL_INFO[pvpSkull(rank)];return i?i.curse:0}
 
-return{healSum,bagExtra,invTarget,fitInv,INV_MAX,HEAL_R,HEAL_EVERY,HEAL_CAP,HEAL_TF,dayKey,dailyTick,dailyEvent,dailyClaim,dailyNextDay,loginRewardFor,dailyGen,VAR_OF,TIERS,needsTier,tierOf,tierMul,effRarity,rollTier,setIgnoreReq,SETS,SET_OF,MARKET_MAX,MARKET_FEE,marketList,marketCancel,marketSale,itemValue,offerValue,tradeCheck,tradeExec,SKINS,SKIN_SLOTS,SKIN_NAMES,unlockSkin,equipSkin,skinOf,skinState,CFG,RARITY,RARITY_BG_MIN_MOB_LEVEL,rarityShown,SLOTS,SLOT_NAME,STYLES,STYLE_ATTR,ITEMS,MONSTERS,EVENTS,SKILLS,STATUS,SHOPS,QUESTS,
- levelXp,skillNeed,newCharacter,stats,rollHit,dmgToMonster,monsterHit,xpFor,gainXp,gainSkill,spendPoint,deathPenalty,elementMult,
+return{VAMP_TF,VAMP_CAP,holdOf,holdAdd,holdRemove,holdGold,holdReturn,holdOffer,holdConsume,holdFits,holdEmpty,isPotion,POTION_DROP_MIN_LV,healSum,bagExtra,invTarget,fitInv,INV_MAX,HEAL_R,HEAL_EVERY,HEAL_CAP,HEAL_TF,dayKey,dailyTick,dailyEvent,dailyClaim,dailyNextDay,loginRewardFor,dailyGen,VAR_OF,TIERS,needsTier,tierOf,tierMul,effRarity,rollTier,setIgnoreReq,SETS,SET_OF,MARKET_MAX,MARKET_FEE,marketList,marketCancel,marketSale,itemValue,offerValue,tradeCheck,tradeExec,SKINS,SKIN_SLOTS,SKIN_NAMES,unlockSkin,equipSkin,skinOf,skinState,CFG,RARITY,RARITY_BG_MIN_MOB_LEVEL,rarityShown,SLOTS,SLOT_NAME,STYLES,STYLE_ATTR,ITEMS,MONSTERS,EVENTS,SKILLS,STATUS,SHOPS,QUESTS,
+ levelXp,skillNeed,newCharacter,stats,rollHit,dmgToMonster,skillEdge,monsterHit,xpFor,gainXp,gainSkill,spendPoint,deathPenalty,elementMult,
  BANK_SLOTS,bankDeposit,bankWithdraw,bankGoldMove,stackMax,roomFor,freeSlots,addItem,addAll,findUid,removeUid,moveSlot,splitStack,equip,unequip,useItem,sellItem,sellPrice,SELL_PCT,buyItem,countItem,countAnywhere,removeItems,meetsReq,shopPrice,
  GROUND_TTL,groundTtl,mulberry32,dropChance,rollDrops,simulateDrops,isEligible,newGround,groundSpawn,spawnKillDrops,groundExpire,groundPickup,
  questAvailable,acceptQuest,questStatus,questEvent,turnInQuest,bossPhase,
